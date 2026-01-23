@@ -5,7 +5,9 @@ import { useUser } from "../components/Context/UserContext";
 
 const Home: React.FC = () => {
   const { user } = useUser();
-  const isAuthor = user?.roles?.some((role) => role.name === "AUTHOR");
+  const isAuthor = user?.roles?.some(
+    (role) => role.name === "AUTHOR" || role.name === "ADMIN",
+  );
   return (
     <div
       className="container"

@@ -19,8 +19,10 @@ const ReviewQuestionsPage: React.FC = () => {
     null,
   );
 
-  // Vérifier si l'utilisateur a le rôle REVIEWER
-  const hasReviewerRole = user?.roles?.some((role) => role.name === "REVIEWER");
+  // Vérifier si l'utilisateur a le rôle REVIEWER ou ADMIN
+  const hasReviewerRole = user?.roles?.some(
+    (role) => role.name === "REVIEWER" || role.name === "ADMIN",
+  );
 
   // Fonctions de mapping pour les labels
   const getStatusLabel = (status?: string): string => {
