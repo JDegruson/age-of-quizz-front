@@ -164,6 +164,14 @@ button:hover {
     background: #4cae4c;
 }
 
+.btn-bg-theme {
+    background: linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #ce7c02 100%) !important;
+    border: none !important;
+    color: #1a1a1a !important;
+    font-weight: 600 !important;
+    transition: all 0.3s ease;
+}
+
 .btn-bg-theme:hover {
     background-color: #ce7c02 !important;
     color: #1a1a1a !important;
