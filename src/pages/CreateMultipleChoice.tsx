@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { createQuestion } from "../services/api";
 import { useUser } from "../components/Context/UserContext";
 import CIVILIZATIONS, { CIVILIZATIONS_MAP } from "../data/civilizations";
+import { BUILDING_OPTIONS } from "../data/buildings";
 import { toast, ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -11,7 +12,8 @@ export default function CreateMultipleChoice() {
   const { user } = useUser();
   const [title, setTitle] = useState("");
   const [theme, setTheme] = useState("TECH_TREE");
-  const [civilization, setCivilization] = useState("");
+  const [civilization, setCivilization] = useState("NONE");
+  const [building, setBuilding] = useState("NONE");
   const [answers, setAnswers] = useState(["", "", "", ""]);
   const [correctIndices, setCorrectIndices] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
@@ -59,7 +61,9 @@ export default function CreateMultipleChoice() {
     // Format attendu par le backend
     const payload = {
       theme: theme,
-      civilisation: civilization ? CIVILIZATIONS_MAP[civilization] : null,
+      civilisation:
+        civilization === "NONE" ? "NONE" : CIVILIZATIONS_MAP[civilization],
+      building: building || "NONE",
       libelle: title,
       type: "MULTIPLE",
       answers: answers
@@ -86,7 +90,8 @@ export default function CreateMultipleChoice() {
       setLoading(false);
       // Réinitialiser le formulaire
       setTitle("");
-      setCivilization("");
+      setCivilization("NONE");
+      setBuilding("NONE");
       setAnswers(["", "", "", ""]);
       setCorrectIndices([]);
       // Optionnel : redirection après un délai
@@ -145,10 +150,25 @@ export default function CreateMultipleChoice() {
                 onChange={(e) => setCivilization(e.target.value)}
                 className="form-select"
               >
-                <option value="">Sélectionnez une civilisation</option>
+                <option value="NONE">Aucune civilisation</option>
                 {CIVILIZATIONS.map((civ) => (
                   <option key={civ} value={civ}>
                     {civ}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mb-3">
+              <label className="form-label">Bâtiment</label>
+              <select
+                value={building}
+                onChange={(e) => setBuilding(e.target.value)}
+                className="form-select"
+              >
+                {BUILDING_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>

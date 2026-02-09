@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import CIVILIZATIONS, { CIVILIZATIONS_MAP } from "../data/civilizations";
+import { BUILDING_OPTIONS } from "../data/buildings";
 import { createQuestion } from "../services/api";
 import { useUser } from "../components/Context/UserContext";
 import { toast, ToastContainer } from "react-toastify";
@@ -11,7 +12,8 @@ export default function CreateTrueFalse() {
   const { user } = useUser();
   const [title, setTitle] = useState("");
   const [theme, setTheme] = useState("TECH_TREE");
-  const [civilization, setCivilization] = useState("");
+  const [civilization, setCivilization] = useState("NONE");
+  const [building, setBuilding] = useState("NONE");
   const [answer, setAnswer] = useState(true);
   const [loading, setLoading] = useState(false);
 
@@ -27,7 +29,9 @@ export default function CreateTrueFalse() {
 
     const payload = {
       theme: theme,
-      civilisation: civilization ? CIVILIZATIONS_MAP[civilization] : null,
+      civilisation:
+        civilization === "NONE" ? "NONE" : CIVILIZATIONS_MAP[civilization],
+      building: building || "NONE",
       libelle: title,
       type: "TRUE_FALSE",
       answers: [
@@ -58,7 +62,8 @@ export default function CreateTrueFalse() {
       setLoading(false);
       // Réinitialiser le formulaire
       setTitle("");
-      setCivilization("");
+      setCivilization("NONE");
+      setBuilding("NONE");
       setAnswer(true);
       // Optionnel : redirection après un délai
       setTimeout(() => {
@@ -118,10 +123,25 @@ export default function CreateTrueFalse() {
                 onChange={(e) => setCivilization(e.target.value)}
                 className="form-select"
               >
-                <option value="">Sélectionnez une civilisation</option>
+                <option value="NONE">Aucune civilisation</option>
                 {CIVILIZATIONS.map((civ) => (
                   <option key={civ} value={civ}>
                     {civ}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="mb-4">
+              <label className="form-label">Bâtiment</label>
+              <select
+                value={building}
+                onChange={(e) => setBuilding(e.target.value)}
+                className="form-select"
+              >
+                {BUILDING_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
                   </option>
                 ))}
               </select>

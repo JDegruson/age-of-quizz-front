@@ -11,6 +11,7 @@ export interface Question {
   type?: string;
   status?: string;
   civilisation?: string;
+  building?: string;
   fileUrl?: string;
   authorUsername?: string;
   answers?: Answer[];
