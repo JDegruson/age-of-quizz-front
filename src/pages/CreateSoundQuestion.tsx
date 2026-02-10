@@ -61,12 +61,7 @@ export default function CreateSoundQuestion() {
       setLoading(true);
 
       // Upload de l'audio d'abord
-      const uploadPath = "questions/audio";
-      const serverAudioPath = await uploadAudio(
-        audioFile,
-        uploadPath,
-        user?.jwt,
-      );
+      const serverAudioPath = await uploadAudio(audioFile, user?.jwt);
 
       // Créer la question avec le chemin de l'audio
       const payload = {

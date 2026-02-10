@@ -77,11 +77,9 @@ export default function CreateImageQuestion() {
       setLoading(true);
 
       // Upload de l'image d'abord
-      const uploadPath = "questions/images";
       const { width, height } = await getImageDimensions(imageFile);
       const serverImagePath = await uploadImage(
         imageFile,
-        uploadPath,
         width,
         height,
         0.8,

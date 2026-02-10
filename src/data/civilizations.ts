@@ -57,4 +57,14 @@ export const CIVILIZATIONS_MAP: Record<string, string> = {
 // Liste des civilisations pour l'affichage dans l'UI (triée alphabétiquement)
 export const CIVILIZATIONS = Object.keys(CIVILIZATIONS_MAP).sort();
 
+export const CIVILIZATIONS_LABELS: Record<string, string> = Object.entries(
+  CIVILIZATIONS_MAP,
+).reduce(
+  (acc, [label, value]) => {
+    acc[value] = label;
+    return acc;
+  },
+  {} as Record<string, string>,
+);
+
 export default CIVILIZATIONS;

@@ -3,6 +3,21 @@ import BACKEND_URL from "../config";
 
 const API_URL = BACKEND_URL;
 
+const sanitizeFilename = (filename: string) => {
+  const parts = filename.split(".");
+  const extension = parts.length > 1 ? `.${parts.pop()}` : "";
+  const baseName = parts.join(".") || "upload";
+  const suffix = `_${Date.now()}`;
+  const asciiBase = baseName
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Za-z0-9._-]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, Math.max(1, 80 - suffix.length));
+  const safeBase = asciiBase || "upload";
+  return `${safeBase}${suffix}${extension}`;
+};
+
 export const fetchQuestions = async (jwt?: string) => {
   try {
     const headers = jwt
@@ -69,18 +84,40 @@ export const updateQuestionStatus = async (
   }
 };
 
+export const updateQuestion = async (questionData: any, jwt?: string) => {
+  try {
+    const headers = jwt
+      ? {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+        }
+      : {
+          "Content-Type": "application/json",
+        };
+    const response = await axios.put(`${API_URL}/questions`, questionData, {
+      headers,
+    });
+    return response.data;
+  } catch (error) {
+    console.error("Error updating question:", error);
+    throw error;
+  }
+};
+
 export const uploadImage = async (
   file: File,
-  path: string,
   width: number,
   height: number,
   quality: number = 0.8,
   jwt?: string,
 ) => {
   try {
+    const safeFile = new File([file], sanitizeFilename(file.name), {
+      type: file.type,
+      lastModified: file.lastModified,
+    });
     const formData = new FormData();
-    formData.append("file", file);
-    formData.append("path", path);
+    formData.append("file", safeFile);
     formData.append("width", width.toString());
     formData.append("height", height.toString());
     formData.append("quality", quality.toString());
@@ -115,11 +152,14 @@ export const uploadImage = async (
   }
 };
 
-export const uploadAudio = async (file: File, path: string, jwt?: string) => {
+export const uploadAudio = async (file: File, jwt?: string) => {
   try {
+    const safeFile = new File([file], sanitizeFilename(file.name), {
+      type: file.type,
+      lastModified: file.lastModified,
+    });
     const formData = new FormData();
-    formData.append("file", file);
-    formData.append("path", path);
+    formData.append("file", safeFile);
 
     const headers = jwt
       ? {

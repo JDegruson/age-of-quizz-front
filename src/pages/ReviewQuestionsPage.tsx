@@ -2,10 +2,32 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useUser } from "../components/Context/UserContext";
 import { useAuth } from "../components/Context/AuthContext";
-import { fetchQuestions, updateQuestionStatus } from "../services/api";
+import {
+  fetchQuestions,
+  updateQuestion,
+  updateQuestionStatus,
+} from "../services/api";
 import { Question } from "../types";
 import BACKEND_URL from "../config";
-import { getBuildingLabel } from "../data/buildings";
+import { BUILDING_OPTIONS, getBuildingLabel } from "../data/buildings";
+import { CIVILIZATIONS_LABELS, CIVILIZATIONS_MAP } from "../data/civilizations";
+
+type EditAnswer = {
+  id?: number;
+  value: string;
+  correct: boolean;
+};
+
+type EditQuestionForm = {
+  id: number;
+  libelle: string;
+  theme: string;
+  civilisation: string;
+  building: string;
+  type: string;
+  fileUrl?: string;
+  answers: EditAnswer[];
+};
 
 const ReviewQuestionsPage: React.FC = () => {
   const { user } = useUser();
@@ -16,10 +38,14 @@ const ReviewQuestionsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("ALL");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
+  const [dateSort, setDateSort] = useState<string>("DESC");
   const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(
     null,
   );
   const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [editForm, setEditForm] = useState<EditQuestionForm | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   // Vérifier si l'utilisateur a le rôle REVIEWER ou ADMIN
   const hasReviewerRole = user?.roles?.some(
@@ -67,24 +93,103 @@ const ReviewQuestionsPage: React.FC = () => {
     return labels[theme || ""] || theme || "N/A";
   };
 
-  const getCivilisationLabel = (civilisation?: string): string => {
-    const labels: { [key: string]: string } = {
-      AZTECS: "Aztèques",
-      BRITONS: "Bretons",
-      BYZANTINES: "Byzantins",
-      CELTS: "Celtes",
-      CHINESE: "Chinois",
-      FRANKS: "Francs",
-      GOTHS: "Goths",
-      JAPANESE: "Japonais",
-      MONGOLS: "Mongols",
-      PERSIANS: "Perses",
-      SARACENS: "Sarrasins",
-      TEUTONS: "Teutons",
-      TURKS: "Turcs",
-      VIKINGS: "Vikings",
+  const themeOptions = ["TECH_TREE", "UNIT_STATS"];
+
+  const buildEditForm = (question: Question): EditQuestionForm => {
+    const rawAnswers: EditAnswer[] = question.answers?.length
+      ? question.answers.map((answer) => ({
+          id: answer.id,
+          value: answer.value || "",
+          correct: Boolean(answer.correct),
+        }))
+      : question.options?.length
+        ? question.options.map((option) => ({
+            value: option,
+            correct: option === question.correctAnswer,
+          }))
+        : question.correctAnswer
+          ? [{ value: question.correctAnswer, correct: true }]
+          : [];
+
+    const normalizedAnswers =
+      question.type === "TRUE_FALSE"
+        ? (() => {
+            const base = [
+              { value: "Vrai", correct: false },
+              { value: "Faux", correct: false },
+            ];
+            const merged = base.map((entry, index) =>
+              rawAnswers[index]
+                ? {
+                    ...entry,
+                    ...rawAnswers[index],
+                  }
+                : entry,
+            );
+            const firstCorrectIndex = merged.findIndex(
+              (answer) => answer.correct,
+            );
+            return merged.map((answer, index) => ({
+              ...answer,
+              correct: index === firstCorrectIndex,
+            }));
+          })()
+        : rawAnswers.length > 0
+          ? rawAnswers
+          : [{ value: "", correct: false }];
+
+    return {
+      id: question.id,
+      libelle: question.libelle || question.questionText || "",
+      theme: question.theme || "TECH_TREE",
+      civilisation: question.civilisation || "NONE",
+      building: question.building || "NONE",
+      type: question.type || "MULTIPLE",
+      fileUrl: question.fileUrl,
+      answers: normalizedAnswers,
     };
-    return labels[civilisation || ""] || civilisation || "N/A";
+  };
+
+  const setEditAnswerValue = (index: number, value: string) => {
+    if (!editForm) return;
+    const nextAnswers = [...editForm.answers];
+    nextAnswers[index] = { ...nextAnswers[index], value };
+    setEditForm({ ...editForm, answers: nextAnswers });
+  };
+
+  const toggleEditAnswerCorrect = (index: number) => {
+    if (!editForm) return;
+    const nextAnswers = editForm.answers.map((answer, idx) => {
+      if (editForm.type === "TRUE_FALSE") {
+        return { ...answer, correct: idx === index };
+      }
+      if (idx === index) {
+        return { ...answer, correct: !answer.correct };
+      }
+      return answer;
+    });
+    setEditForm({ ...editForm, answers: nextAnswers });
+  };
+
+  const addEditAnswer = () => {
+    if (!editForm || editForm.type === "TRUE_FALSE") return;
+    setEditForm({
+      ...editForm,
+      answers: [...editForm.answers, { value: "", correct: false }],
+    });
+  };
+
+  const removeEditAnswer = (index: number) => {
+    if (!editForm || editForm.type === "TRUE_FALSE") return;
+    const nextAnswers = editForm.answers.filter((_, idx) => idx !== index);
+    setEditForm({ ...editForm, answers: nextAnswers });
+  };
+
+  const getCivilisationLabel = (civilisation?: string): string => {
+    if (!civilisation || civilisation === "NONE" || civilisation === "None") {
+      return "Aucune civilisation";
+    }
+    return CIVILIZATIONS_LABELS[civilisation] || civilisation;
   };
 
   useEffect(() => {
@@ -146,10 +251,69 @@ const ReviewQuestionsPage: React.FC = () => {
     }
   };
 
+  const handleEditSave = async () => {
+    if (!user?.jwt || !editForm) return;
+
+    const trimmedAnswers = editForm.answers
+      .map((answer) => ({
+        ...answer,
+        value: answer.value.trim(),
+      }))
+      .filter((answer) => answer.value);
+
+    if (!editForm.libelle.trim()) {
+      setError("Le libelle est requis pour la modification");
+      return;
+    }
+
+    if (trimmedAnswers.length === 0) {
+      setError("Au moins une reponse est requise");
+      return;
+    }
+
+    try {
+      setSavingEdit(true);
+      setError(null);
+      await updateQuestion(
+        {
+          id: editForm.id,
+          libelle: editForm.libelle.trim(),
+          theme: editForm.theme,
+          civilisation: editForm.civilisation || "NONE",
+          building: editForm.building || "NONE",
+          type: editForm.type,
+          fileUrl: editForm.fileUrl,
+          answers: trimmedAnswers.map((answer) => ({
+            id: answer.id,
+            value: answer.value,
+            correct: answer.correct,
+          })),
+        },
+        user.jwt,
+      );
+      const data = await fetchQuestions(user.jwt);
+      setQuestions(data);
+      setEditForm(null);
+    } catch (err) {
+      setError("Erreur lors de la modification de la question");
+      console.error(err);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const filteredQuestions = questions.filter((q) => {
     const matchesStatus = filter === "ALL" || q.status === filter;
     const matchesType = typeFilter === "ALL" || q.type === typeFilter;
     return matchesStatus && matchesType;
+  });
+
+  const sortedQuestions = [...filteredQuestions].sort((a, b) => {
+    const aDate = a.updatedAt || a.createdAt;
+    const bDate = b.updatedAt || b.createdAt;
+    const aTime = aDate ? new Date(aDate).getTime() : 0;
+    const bTime = bDate ? new Date(bDate).getTime() : 0;
+    return dateSort === "DESC" ? bTime - aTime : aTime - bTime;
   });
 
   const getStatusBadge = (status?: string) => {
@@ -306,6 +470,32 @@ const ReviewQuestionsPage: React.FC = () => {
               <option value="IMAGE">Question image</option>
             </select>
           </div>
+          <div>
+            <label
+              style={{
+                marginRight: "10px",
+                fontWeight: "bold",
+                color: "#e5e7eb",
+              }}
+            >
+              Trier par date (modif/crea):
+            </label>
+            <select
+              value={dateSort}
+              onChange={(e) => setDateSort(e.target.value)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "4px",
+                border: "1px solid #4b5563",
+                fontSize: "14px",
+                backgroundColor: "#374151",
+                color: "#e5e7eb",
+              }}
+            >
+              <option value="DESC">Plus recente</option>
+              <option value="ASC">Plus ancienne</option>
+            </select>
+          </div>
         </div>
 
         <div
@@ -315,7 +505,7 @@ const ReviewQuestionsPage: React.FC = () => {
         </div>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {filteredQuestions.map((question) => (
+          {sortedQuestions.map((question) => (
             <div
               key={question.id}
               style={{
@@ -361,19 +551,12 @@ const ReviewQuestionsPage: React.FC = () => {
                       Thème: {getThemeLabel(question.theme)}
                     </p>
                   )}
-                  {question.civilisation && (
-                    <p style={{ fontSize: "14px", color: "#9ca3af" }}>
-                      Civilisation:{" "}
-                      {getCivilisationLabel(question.civilisation)}
-                    </p>
-                  )}
-                  {question.building &&
-                    question.building !== "NONE" &&
-                    question.building !== "None" && (
-                      <p style={{ fontSize: "14px", color: "#9ca3af" }}>
-                        Bâtiment: {getBuildingLabel(question.building)}
-                      </p>
-                    )}
+                  <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                    Civilisation: {getCivilisationLabel(question.civilisation)}
+                  </p>
+                  <p style={{ fontSize: "14px", color: "#9ca3af" }}>
+                    Bâtiment: {getBuildingLabel(question.building)}
+                  </p>
                 </div>
                 {getStatusBadge(question.status)}
               </div>
@@ -396,6 +579,25 @@ const ReviewQuestionsPage: React.FC = () => {
                   }}
                 >
                   Approuver
+                </button>
+                <button
+                  style={{
+                    padding: "8px 16px",
+                    backgroundColor: "#2563eb",
+                    color: "white",
+                    border: "none",
+                    borderRadius: "4px",
+                    cursor: "pointer",
+                    fontSize: "14px",
+                    fontWeight: "500",
+                  }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setExpandedQuestionId(question.id);
+                    setEditForm(buildEditForm(question));
+                  }}
+                >
+                  Modifier
                 </button>
                 <button
                   style={{
@@ -448,6 +650,326 @@ const ReviewQuestionsPage: React.FC = () => {
                     border: "1px solid #374151",
                   }}
                 >
+                  {editForm?.id === question.id && (
+                    <div
+                      onClick={(event) => event.stopPropagation()}
+                      onMouseDown={(event) => event.stopPropagation()}
+                      style={{
+                        marginBottom: "20px",
+                        padding: "16px",
+                        backgroundColor: "#0f172a",
+                        borderRadius: "8px",
+                        border: "1px solid #1f2937",
+                      }}
+                    >
+                      <h4
+                        style={{
+                          fontSize: "16px",
+                          fontWeight: "600",
+                          marginBottom: "16px",
+                          color: "#e5e7eb",
+                        }}
+                      >
+                        Modifier la question
+                      </h4>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "12px",
+                        }}
+                      >
+                        <div>
+                          <label
+                            style={{
+                              display: "block",
+                              marginBottom: "6px",
+                              color: "#9ca3af",
+                              fontWeight: "600",
+                            }}
+                          >
+                            Libelle
+                          </label>
+                          <input
+                            type="text"
+                            value={editForm.libelle}
+                            onChange={(event) =>
+                              setEditForm({
+                                ...editForm,
+                                libelle: event.target.value,
+                              })
+                            }
+                            style={{
+                              width: "100%",
+                              padding: "8px 12px",
+                              borderRadius: "6px",
+                              border: "1px solid #374151",
+                              backgroundColor: "#1f2937",
+                              color: "#e5e7eb",
+                            }}
+                          />
+                        </div>
+
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns:
+                              "repeat(auto-fit, minmax(200px, 1fr))",
+                            gap: "12px",
+                          }}
+                        >
+                          <div>
+                            <label
+                              style={{
+                                display: "block",
+                                marginBottom: "6px",
+                                color: "#9ca3af",
+                                fontWeight: "600",
+                              }}
+                            >
+                              Theme
+                            </label>
+                            <select
+                              value={editForm.theme}
+                              onChange={(event) =>
+                                setEditForm({
+                                  ...editForm,
+                                  theme: event.target.value,
+                                })
+                              }
+                              style={{
+                                width: "100%",
+                                padding: "8px 12px",
+                                borderRadius: "6px",
+                                border: "1px solid #374151",
+                                backgroundColor: "#1f2937",
+                                color: "#e5e7eb",
+                              }}
+                            >
+                              {themeOptions.map((value) => (
+                                <option key={value} value={value}>
+                                  {getThemeLabel(value)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div>
+                            <label
+                              style={{
+                                display: "block",
+                                marginBottom: "6px",
+                                color: "#9ca3af",
+                                fontWeight: "600",
+                              }}
+                            >
+                              Civilisation
+                            </label>
+                            <select
+                              value={editForm.civilisation}
+                              onChange={(event) =>
+                                setEditForm({
+                                  ...editForm,
+                                  civilisation: event.target.value,
+                                })
+                              }
+                              style={{
+                                width: "100%",
+                                padding: "8px 12px",
+                                borderRadius: "6px",
+                                border: "1px solid #374151",
+                                backgroundColor: "#1f2937",
+                                color: "#e5e7eb",
+                              }}
+                            >
+                              <option value="NONE">Aucune civilisation</option>
+                              {Object.entries(CIVILIZATIONS_MAP).map(
+                                ([label, value]) => (
+                                  <option key={value} value={value}>
+                                    {label}
+                                  </option>
+                                ),
+                              )}
+                            </select>
+                          </div>
+                          <div>
+                            <label
+                              style={{
+                                display: "block",
+                                marginBottom: "6px",
+                                color: "#9ca3af",
+                                fontWeight: "600",
+                              }}
+                            >
+                              Batiment
+                            </label>
+                            <select
+                              value={editForm.building}
+                              onChange={(event) =>
+                                setEditForm({
+                                  ...editForm,
+                                  building: event.target.value,
+                                })
+                              }
+                              style={{
+                                width: "100%",
+                                padding: "8px 12px",
+                                borderRadius: "6px",
+                                border: "1px solid #374151",
+                                backgroundColor: "#1f2937",
+                                color: "#e5e7eb",
+                              }}
+                            >
+                              {BUILDING_OPTIONS.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        </div>
+
+                        <div>
+                          <div
+                            style={{
+                              color: "#9ca3af",
+                              fontWeight: "600",
+                              marginBottom: "8px",
+                            }}
+                          >
+                            Reponses
+                          </div>
+                          <div
+                            style={{
+                              display: "flex",
+                              flexDirection: "column",
+                              gap: "8px",
+                            }}
+                          >
+                            {editForm.answers.map((answer, index) => (
+                              <div
+                                key={`${editForm.id}-answer-${index}`}
+                                style={{
+                                  display: "grid",
+                                  gridTemplateColumns: "1fr auto auto",
+                                  gap: "8px",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <input
+                                  type="text"
+                                  value={answer.value}
+                                  onChange={(event) =>
+                                    setEditAnswerValue(
+                                      index,
+                                      event.target.value,
+                                    )
+                                  }
+                                  style={{
+                                    width: "100%",
+                                    padding: "8px 12px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #374151",
+                                    backgroundColor: "#1f2937",
+                                    color: "#e5e7eb",
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => toggleEditAnswerCorrect(index)}
+                                  style={{
+                                    padding: "6px 10px",
+                                    borderRadius: "6px",
+                                    border: "1px solid #374151",
+                                    backgroundColor: answer.correct
+                                      ? "#065f46"
+                                      : "#1f2937",
+                                    color: "#e5e7eb",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  {answer.correct ? "Correct" : "Marquer"}
+                                </button>
+                                {editForm.type !== "TRUE_FALSE" && (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeEditAnswer(index)}
+                                    style={{
+                                      padding: "6px 10px",
+                                      borderRadius: "6px",
+                                      border: "1px solid #7f1d1d",
+                                      backgroundColor: "#991b1b",
+                                      color: "#fee2e2",
+                                      cursor: "pointer",
+                                    }}
+                                  >
+                                    Supprimer
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                          {editForm.type !== "TRUE_FALSE" && (
+                            <button
+                              type="button"
+                              onClick={addEditAnswer}
+                              style={{
+                                marginTop: "10px",
+                                padding: "6px 12px",
+                                borderRadius: "6px",
+                                border: "1px solid #374151",
+                                backgroundColor: "#1f2937",
+                                color: "#e5e7eb",
+                                cursor: "pointer",
+                              }}
+                            >
+                              Ajouter une reponse
+                            </button>
+                          )}
+                        </div>
+
+                        <div
+                          style={{
+                            display: "flex",
+                            gap: "8px",
+                            marginTop: "8px",
+                          }}
+                        >
+                          <button
+                            type="button"
+                            onClick={handleEditSave}
+                            disabled={savingEdit}
+                            style={{
+                              padding: "8px 16px",
+                              backgroundColor: "#10b981",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "6px",
+                              cursor: savingEdit ? "not-allowed" : "pointer",
+                              fontWeight: "600",
+                            }}
+                          >
+                            {savingEdit ? "Enregistrement..." : "Enregistrer"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setEditForm(null)}
+                            disabled={savingEdit}
+                            style={{
+                              padding: "8px 16px",
+                              backgroundColor: "#374151",
+                              color: "white",
+                              border: "none",
+                              borderRadius: "6px",
+                              cursor: savingEdit ? "not-allowed" : "pointer",
+                              fontWeight: "600",
+                            }}
+                          >
+                            Annuler
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   <h4
                     style={{
                       fontSize: "16px",
@@ -490,29 +1012,23 @@ const ReviewQuestionsPage: React.FC = () => {
                       </div>
                     )}
 
-                    {question.civilisation && (
-                      <div>
-                        <span style={{ color: "#9ca3af", fontWeight: "600" }}>
-                          Civilisation:{" "}
-                        </span>
-                        <span style={{ color: "#e5e7eb" }}>
-                          {getCivilisationLabel(question.civilisation)}
-                        </span>
-                      </div>
-                    )}
+                    <div>
+                      <span style={{ color: "#9ca3af", fontWeight: "600" }}>
+                        Civilisation:{" "}
+                      </span>
+                      <span style={{ color: "#e5e7eb" }}>
+                        {getCivilisationLabel(question.civilisation)}
+                      </span>
+                    </div>
 
-                    {question.building &&
-                      question.building !== "NONE" &&
-                      question.building !== "None" && (
-                        <div>
-                          <span style={{ color: "#9ca3af", fontWeight: "600" }}>
-                            Bâtiment:{" "}
-                          </span>
-                          <span style={{ color: "#e5e7eb" }}>
-                            {getBuildingLabel(question.building)}
-                          </span>
-                        </div>
-                      )}
+                    <div>
+                      <span style={{ color: "#9ca3af", fontWeight: "600" }}>
+                        Bâtiment:{" "}
+                      </span>
+                      <span style={{ color: "#e5e7eb" }}>
+                        {getBuildingLabel(question.building)}
+                      </span>
+                    </div>
 
                     {question.fileUrl && (
                       <div>
@@ -532,10 +1048,15 @@ const ReviewQuestionsPage: React.FC = () => {
                                 <img
                                   src={imageUrl}
                                   alt="Question"
-                                  onClick={() => setZoomedImageUrl(imageUrl)}
+                                  onClick={() => {
+                                    setZoomLevel(1);
+                                    setZoomedImageUrl(imageUrl);
+                                  }}
                                   title="Cliquer pour zoomer"
                                   style={{
-                                    maxWidth: "100%",
+                                    maxWidth: "320px",
+                                    width: "100%",
+                                    height: "auto",
                                     borderRadius: "8px",
                                     border: "1px solid #374151",
                                     cursor: "zoom-in",
@@ -782,6 +1303,7 @@ const ReviewQuestionsPage: React.FC = () => {
             bottom: 0,
             backgroundColor: "rgba(0, 0, 0, 0.8)",
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
             zIndex: 1000,
@@ -793,13 +1315,19 @@ const ReviewQuestionsPage: React.FC = () => {
           <img
             src={zoomedImageUrl}
             alt="Agrandissement"
-            onClick={(event) => event.stopPropagation()}
+            onClick={(event) => {
+              event.stopPropagation();
+              setZoomLevel((prev) => (prev === 1 ? 2 : 1));
+            }}
             style={{
               maxWidth: "95%",
               maxHeight: "95%",
               borderRadius: "8px",
               border: "1px solid #374151",
               backgroundColor: "#111827",
+              transform: `scale(${zoomLevel})`,
+              transformOrigin: "center center",
+              cursor: zoomLevel === 1 ? "zoom-in" : "zoom-out",
             }}
           />
         </div>
