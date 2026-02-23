@@ -79,21 +79,15 @@ const ReviewQuestionsPage: React.FC = () => {
 
   const getThemeLabel = (theme?: string): string => {
     const labels: { [key: string]: string } = {
-      HISTORY: "Histoire",
-      GEOGRAPHY: "Géographie",
-      CULTURE: "Culture",
-      MILITARY: "Militaire",
-      ECONOMY: "Économie",
-      TECHNOLOGY: "Technologie",
-      RELIGION: "Religion",
-      ART: "Art",
       TECH_TREE: "Arbre des technologies",
+      IMAGE: "Image",
       UNIT_STATS: "Statistiques des unités",
+      SOUND: "Son",
     };
     return labels[theme || ""] || theme || "N/A";
   };
 
-  const themeOptions = ["TECH_TREE", "UNIT_STATS"];
+  const themeOptions = ["TECH_TREE", "IMAGE", "UNIT_STATS", "SOUND"];
 
   const buildEditForm = (question: Question): EditQuestionForm => {
     const rawAnswers: EditAnswer[] = question.answers?.length
@@ -539,7 +533,9 @@ const ReviewQuestionsPage: React.FC = () => {
                       color: "#e5e7eb",
                     }}
                   >
-                    {question.libelle || question.questionText}
+                    {question.libelle ||
+                      question.questionText ||
+                      "(Pas d'intitulé)"}
                   </h3>
                   {question.type && (
                     <p style={{ fontSize: "14px", color: "#9ca3af" }}>
@@ -1043,7 +1039,7 @@ const ReviewQuestionsPage: React.FC = () => {
                                 .split(/[/\\]/)
                                 .pop();
                               const imageUrl = `${BACKEND_URL}/media/image/${encodeURIComponent(filename || "")}`;
-                              console.log("Image URL:", imageUrl);
+
                               return (
                                 <img
                                   src={imageUrl}
@@ -1071,11 +1067,8 @@ const ReviewQuestionsPage: React.FC = () => {
                                 .split(/[/\\]/)
                                 .pop();
                               const audioUrl = `${BACKEND_URL}/media/audio/${encodeURIComponent(filename || "")}`;
-                              console.log("Audio URL:", audioUrl);
-                              console.log(
-                                "Question fileUrl:",
-                                question.fileUrl,
-                              );
+
+                              // ...log supprimé...
                               return (
                                 <audio
                                   controls
@@ -1156,6 +1149,7 @@ const ReviewQuestionsPage: React.FC = () => {
                     )}
 
                     {/* Réponses/Options */}
+                    {/* Affichage des réponses, fallback si answers absent */}
                     {question.answers && question.answers.length > 0 ? (
                       <div>
                         <span
@@ -1264,7 +1258,11 @@ const ReviewQuestionsPage: React.FC = () => {
                           {question.correctAnswer}
                         </span>
                       </div>
-                    ) : null}
+                    ) : (
+                      <div style={{ color: "#f87171", marginTop: 8 }}>
+                        Aucune réponse disponible pour cette question.
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

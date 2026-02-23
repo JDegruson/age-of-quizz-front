@@ -75,7 +75,7 @@ const RegisterPage = () => {
 
     try {
       const cleanedUser = trimUserFields(user);
-      console.log("Register payload:", cleanedUser);
+
       const response = await fetch(`${BACKEND_URL}/register`, {
         method: "POST",
         headers: {
@@ -105,7 +105,6 @@ const RegisterPage = () => {
         setError("Une erreur est survenue");
         setPseudoError(false);
       }
-      console.log(error.message);
     }
   };
 

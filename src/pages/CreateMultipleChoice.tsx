@@ -50,6 +50,17 @@ export default function CreateMultipleChoice() {
       return;
     }
 
+    // Check for duplicate answers
+    const trimmedAnswers = answers.map((a) => a.trim()).filter((a) => a);
+    const lowerSet = new Set(trimmedAnswers.map((a) => a.toLowerCase()));
+    if (lowerSet.size !== trimmedAnswers.length) {
+      toast.error("Chaque réponse doit être unique", {
+        position: "top-right",
+        autoClose: 3000,
+      });
+      return;
+    }
+
     if (correctIndices.length === 0) {
       toast.error("Au moins une bonne réponse doit être sélectionnée", {
         position: "top-right",
@@ -73,8 +84,6 @@ export default function CreateMultipleChoice() {
         }))
         .filter((a) => a.value), // Exclure les réponses vides
     };
-
-    console.log("Payload envoyé au backend:", JSON.stringify(payload, null, 2));
 
     try {
       setLoading(true);

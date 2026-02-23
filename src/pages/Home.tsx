@@ -22,10 +22,13 @@ const Home: React.FC = () => {
         </div>
 
         <div className="d-grid gap-3 col-md-8 mx-auto mt-5">
-          <button className="btn btn-lg btn-gold py-3 rounded-pill shadow">
+          <Link
+            to="/play"
+            className="btn btn-lg btn-gold py-3 rounded-pill shadow"
+          >
             <i className="bi bi-play-circle me-2"></i>
             Jouer
-          </button>
+          </Link>
           {isAuthor && (
             <Link
               to="/create-question"

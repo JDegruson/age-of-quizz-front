@@ -32,7 +32,7 @@ const UserProfileComponent: React.FC<UserProfileProps> = ({
         });
         if (!response.ok) {
           throw new Error(
-            `Erreur ${response.status}: ${await response.text()}`
+            `Erreur ${response.status}: ${await response.text()}`,
           );
         }
 
@@ -40,7 +40,6 @@ const UserProfileComponent: React.FC<UserProfileProps> = ({
         setUserProfile(data);
       } catch (err: any) {
         setError("Profil utilisateur non trouvé");
-        console.log(err.message);
       } finally {
         setLoading(false);
       }
@@ -71,7 +70,6 @@ const UserProfileComponent: React.FC<UserProfileProps> = ({
       navigate("/messagerie");
     } catch (err: any) {
       setError("Impossible d'envoyer un message à cet utilisateur");
-      console.log(err.message);
     }
   };
   if (loading)

@@ -1,49 +1,39 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 
-export default function ChooseQuestionType() {
+const ChooseGameModePage: React.FC = () => {
   const navigate = useNavigate();
-
   return (
     <div className="container" style={{ maxWidth: 600, marginTop: 60 }}>
       <div className="card shadow-lg p-5 d-flex flex-column align-items-center">
         <h2 className="fw-bold mb-3 text-center" style={{ color: "#FFD700" }}>
-          Création de question
+          Mode de jeu
         </h2>
         <p className="mb-4 text-center" style={{ color: "#e0e0e0" }}>
-          Choisissez le type de question à créer.
+          Choisissez si vous souhaitez jouer seul ou à plusieurs.
         </p>
         <div
           className="d-flex flex-column gap-4 w-100"
           style={{ maxWidth: 400 }}
         >
           <button
-            className="btn btn-outline-gold fs-5 py-3 rounded-3 shadow-sm"
-            onClick={() => navigate("/create-question/multiple")}
+            className="btn btn-bg-theme fs-5 py-3 rounded-3 shadow-sm"
+            onClick={() => navigate("/quizz/solo")}
             style={{ fontWeight: 600 }}
           >
-            QCM (choix multiple)
+            Jouer en solo
           </button>
           <button
             className="btn btn-outline-gold fs-5 py-3 rounded-3 shadow-sm"
-            onClick={() => navigate("/create-question/truefalse")}
+            onClick={() => {}}
             style={{ fontWeight: 600 }}
+            disabled
+            title="Bientôt disponible"
           >
-            Vrai / Faux
-          </button>
-          <button
-            className="btn btn-outline-gold fs-5 py-3 rounded-3 shadow-sm"
-            onClick={() => navigate("/create-question/image")}
-            style={{ fontWeight: 600 }}
-          >
-            Question image
-          </button>
-          <button
-            className="btn btn-outline-gold fs-5 py-3 rounded-3 shadow-sm"
-            onClick={() => navigate("/create-question/sound")}
-            style={{ fontWeight: 600 }}
-          >
-            Question audio
+            Jouer à plusieurs{" "}
+            <span style={{ fontSize: 14, color: "#ce7c02", marginLeft: 8 }}>
+              (bientôt)
+            </span>
           </button>
         </div>
         <div className="text-center mt-4">
@@ -58,4 +48,6 @@ export default function ChooseQuestionType() {
       </div>
     </div>
   );
-}
+};
+
+export default ChooseGameModePage;

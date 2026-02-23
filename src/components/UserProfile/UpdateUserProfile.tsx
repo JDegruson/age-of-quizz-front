@@ -32,19 +32,16 @@ const UpdateUserProfile: React.FC<UpdateUserProfileProps> = ({
     const getUser = async () => {
       try {
         const jwt = user?.jwt;
-        const response = await fetch(
-          `${BACKEND_URL}/users/current`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${jwt}`,
-            },
-          }
-        );
+        const response = await fetch(`${BACKEND_URL}/users/current`, {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${jwt}`,
+          },
+        });
 
         if (!response.ok) {
           throw new Error(
-            `Erreur ${response.status}: ${await response.text()}`
+            `Erreur ${response.status}: ${await response.text()}`,
           );
         }
 
@@ -57,7 +54,6 @@ const UpdateUserProfile: React.FC<UpdateUserProfileProps> = ({
         setEmail(data.email);
       } catch (err: any) {
         setError("Utilisateur introuvable");
-        console.log(err.message);
       } finally {
         setLoading(false);
       }
@@ -94,17 +90,14 @@ const UpdateUserProfile: React.FC<UpdateUserProfileProps> = ({
 
     try {
       const jwt = user?.jwt;
-      const response = await fetch(
-        `${BACKEND_URL}/users/update`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${jwt}`,
-          },
-          body: JSON.stringify(updatedUser),
-        }
-      );
+      const response = await fetch(`${BACKEND_URL}/users/update`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${jwt}`,
+        },
+        body: JSON.stringify(updatedUser),
+      });
 
       if (!response.ok) {
         throw new Error(`Erreur ${response.status}: ${await response.text()}`);
@@ -120,7 +113,6 @@ const UpdateUserProfile: React.FC<UpdateUserProfileProps> = ({
       } else {
         setError("Une erreur est survenue.");
       }
-      console.log(err.message);
     }
   };
 

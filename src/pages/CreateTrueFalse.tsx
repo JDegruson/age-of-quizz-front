@@ -46,8 +46,6 @@ export default function CreateTrueFalse() {
       ],
     };
 
-    console.log("Payload envoyé au backend:", JSON.stringify(payload, null, 2));
-
     try {
       setLoading(true);
       await createQuestion(payload, user?.jwt);

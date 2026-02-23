@@ -80,11 +80,6 @@ export default function CreateSoundQuestion() {
           .filter((a) => a.value),
       };
 
-      console.log(
-        "Payload envoyé au backend:",
-        JSON.stringify(payload, null, 2),
-      );
-
       await createQuestion(payload, user?.jwt);
       toast.success("Question créée avec succès !", {
         position: "top-right",

@@ -1,3 +1,5 @@
+import SoloQuizStartPage from "./pages/SoloQuizStartPage";
+import ChooseGameModePage from "./pages/ChooseGameModePage";
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
@@ -10,8 +12,11 @@ import Navbar from "./components/Navbar";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import AskMailpage from "./pages/AskMailPage";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage";
 import ResetPasswordPage from "./pages/ResetPasswordPage";
 import UserProfilePage from "./pages/UserProfilePage";
+
+import QuizPage from "./pages/QuizPage";
 import ReviewQuestionsPage from "./pages/ReviewQuestionsPage";
 
 import { AuthProvider } from "./components/Context/AuthContext";
@@ -51,7 +56,8 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
 
-            <Route path="/forgot-password" element={<AskMailpage />} />
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/ask-mail" element={<ForgotPasswordPage />} />
             <Route path="/reset-password" element={<ResetPasswordPage />} />
             <Route
               path="/reset-password/:token"
@@ -61,6 +67,9 @@ export default function App() {
             <Route path="/profile" element={<UserProfilePage />} />
 
             <Route path="/review-questions" element={<ReviewQuestionsPage />} />
+            <Route path="/play" element={<ChooseGameModePage />} />
+            <Route path="/quizz/solo" element={<SoloQuizStartPage />} />
+            <Route path="/quiz" element={<QuizPage />} />
           </Routes>
         </AuthProvider>
       </UserProvider>

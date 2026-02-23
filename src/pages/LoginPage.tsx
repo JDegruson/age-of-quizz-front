@@ -45,10 +45,9 @@ const LoginPage: React.FC = () => {
               <a href="/ask-mail" className="text-decoration-underline">
                 Mot de passe oublié ?
               </a>
-            </>
+            </>,
           );
         } else if (error.response?.data === "Profil utilisateur non trouvé") {
-          console.log(error.response?.data);
           setError(
             <>
               Utilisateur ou mot de passe erroné.
@@ -56,14 +55,12 @@ const LoginPage: React.FC = () => {
               <a href="/ask-mail" className="text-decoration-underline">
                 Mot de passe oublié ?
               </a>
-            </>
+            </>,
           );
         } else {
-          console.log(error.response?.data);
           setError("Une erreur est survenue.");
         }
       } else {
-        console.log((error as Error).message);
         setError("Une erreur est survenue.");
       }
     }
