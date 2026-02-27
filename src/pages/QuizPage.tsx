@@ -3,13 +3,17 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import BACKEND_URL from "../config";
+import { submitAnswers } from "../services/api";
+import { useUser } from "../components/Context/UserContext";
 
 // Types
 interface QuizQuestion {
   id: number;
   intitule: string;
   options: string[];
+  optionIds: number[];
   correctAnswers: string[];
+  correctAnswerIds: number[];
   type: string; // MULTIPLE, TRUE_FALSE, etc.
   fileUrl?: string;
 }
@@ -30,30 +34,46 @@ function normalizeQuestions(rawQuestions: any[]): QuizQuestion[] {
 
     // Handle options and correct answers
     let options: string[] = [];
+    let optionIds: number[] = [];
     let correctAnswers: string[] = [];
+    let correctAnswerIds: number[] = [];
 
     // Case 1: Backend provides 'reponses' array (AoE format)
     if (Array.isArray(q.reponses)) {
       options = q.reponses.map((r: any) => r.intitule || r.value || "");
+      optionIds = q.reponses.map((r: any) => r.id || 0);
       correctAnswers = q.reponses
         .filter((r: any) => r.bonne === true || r.correct === true)
         .map((r: any) => r.intitule || r.value || "");
+      correctAnswerIds = q.reponses
+        .filter((r: any) => r.bonne === true || r.correct === true)
+        .map((r: any) => r.id || 0);
     }
     // Case 2: 'answers' array (from types/index.ts)
     else if (Array.isArray(q.answers)) {
       options = q.answers.map((a: any) => a.value || a.intitule || "");
+      optionIds = q.answers.map((a: any) => a.id || 0);
       correctAnswers = q.answers
         .filter((a: any) => a.correct === true || a.bonne === true)
         .map((a: any) => a.value || a.intitule || "");
+      correctAnswerIds = q.answers
+        .filter((a: any) => a.correct === true || a.bonne === true)
+        .map((a: any) => a.id || 0);
     }
     // Case 3: Already normalized
     else if (Array.isArray(q.options)) {
       options = q.options;
+      optionIds = Array.isArray(q.optionIds)
+        ? q.optionIds
+        : q.options.map((_: string, i: number) => i);
       correctAnswers = Array.isArray(q.correctAnswers)
         ? q.correctAnswers
         : q.correctAnswer
           ? [q.correctAnswer]
           : [];
+      correctAnswerIds = Array.isArray(q.correctAnswerIds)
+        ? q.correctAnswerIds
+        : [];
     }
 
     // Fallback: TRUE_FALSE type
@@ -62,8 +82,10 @@ function normalizeQuestions(rawQuestions: any[]): QuizQuestion[] {
       (q.type === "TRUE_FALSE" || q.type === "VRAI_FAUX")
     ) {
       options = ["Vrai", "Faux"];
+      optionIds = [1, 2]; // Default IDs for TRUE_FALSE
       if (typeof q.correctAnswer === "string") {
         correctAnswers = [q.correctAnswer];
+        correctAnswerIds = [q.correctAnswer === "Vrai" ? 1 : 2];
       }
     }
 
@@ -86,7 +108,9 @@ function normalizeQuestions(rawQuestions: any[]): QuizQuestion[] {
       id: q.id,
       intitule,
       options: options || [],
+      optionIds: optionIds || [],
       correctAnswers: correctAnswers || [],
+      correctAnswerIds: correctAnswerIds || [],
       type: q.type || "MULTIPLE",
       fileUrl: fileUrl || undefined,
     };
@@ -96,15 +120,17 @@ function normalizeQuestions(rawQuestions: any[]): QuizQuestion[] {
 const QuizPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useUser();
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [current, setCurrent] = useState(0);
-  const [answers, setAnswers] = useState<string[][]>([]);
+  const [answers, setAnswers] = useState<number[][]>([]);
   const [showCorrection, setShowCorrection] = useState(false);
   const [score, setScore] = useState(0);
   const [points, setPoints] = useState(0);
   const [questionPoints, setQuestionPoints] = useState<number[]>([]);
   const [answerTimers, setAnswerTimers] = useState<number[]>([]);
   const [results, setResults] = useState<QuizResult[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [audioBlobUrl, setAudioBlobUrl] = useState<string | null>(null);
   const [timer, setTimer] = useState(15);
@@ -193,52 +219,93 @@ const QuizPage: React.FC = () => {
   }, [questions, current]);
 
   // Handle answer selection
-  const handleSelect = (option: string) => {
+  const handleSelect = (optionText: string) => {
     setAnswers((prev) => {
       const updated = [...prev];
       const q = questions[current];
+      // Find the ID of the selected option
+      const optionIndex = q.options.indexOf(optionText);
+      const optionId = optionIndex >= 0 ? q.optionIds[optionIndex] : 0;
+
       // Allow multi-select for MULTIPLE, SOUND, and IMAGE types
       if (q.type === "MULTIPLE" || q.type === "SOUND" || q.type === "IMAGE") {
-        updated[current] = updated[current].includes(option)
-          ? updated[current].filter((o) => o !== option)
-          : [...updated[current], option];
+        updated[current] = updated[current].includes(optionId)
+          ? updated[current].filter((id) => id !== optionId)
+          : [...updated[current], optionId];
       } else {
-        updated[current] = [option];
+        updated[current] = [optionId];
       }
       return updated;
     });
   };
 
   // Next question or show correction
-  const handleNext = () => {
+  const handleNext = async () => {
     // Save the current timer value for this question before moving
     const updatedTimers = [...answerTimers];
-    updatedTimers[current] = Math.max(1, timer); // 1 à 15 points
+    updatedTimers[current] = Math.max(1, 15 - timer); // Temps écoulé (1 à 15 secondes)
     setAnswerTimers(updatedTimers);
 
     if (current < questions.length - 1) {
       setCurrent(current + 1);
     } else {
-      // Correction phase
-      const res: QuizResult[] = questions.map((q, i) => ({
+      // Preparation de la phase de correction et envoi des réponses
+      // Prepare results with text for display
+      const res: QuizResult[] = questions.map((q, i) => {
+        const selectedTexts = answers[i].map((id) => {
+          const idx = q.optionIds.indexOf(id);
+          return idx >= 0 ? q.options[idx] : "";
+        });
+        return {
+          questionId: q.id,
+          selected: selectedTexts,
+          correct: q.correctAnswers,
+          intitule: q.intitule,
+          options: q.options,
+        };
+      });
+
+      // Prepare data to send to backend (with IDs)
+      const submitData = questions.map((q, i) => ({
         questionId: q.id,
-        selected: answers[i],
-        correct: q.correctAnswers,
-        intitule: q.intitule,
-        options: q.options,
+        answerIds: answers[i],
+        responseTimeSeconds: updatedTimers[i] || 1,
       }));
+
       setResults(res);
+      setIsSubmitting(true);
+
+      try {
+        // Submit answers to backend
+        const jwt = user?.jwt;
+        if (!jwt) {
+          console.warn("JWT not found, skipping answer submission");
+        } else {
+          await submitAnswers(submitData, jwt);
+          console.log("Answers submitted successfully");
+        }
+      } catch (error) {
+        console.error("Error submitting answers:", error);
+        // Continue to show correction even if submission fails
+      } finally {
+        setIsSubmitting(false);
+      }
+
       setShowCorrection(true);
+
       // Score et points - ONLY if ALL correct answers are selected
       let sc = 0;
       let pts = 0;
-      res.forEach((r, i) => {
+      questions.forEach((q, i) => {
+        const selectedIds = answers[i];
+        const correctIds = q.correctAnswerIds;
         const isGood =
-          r.selected.length === r.correct.length &&
-          r.selected.every((ans) => r.correct.includes(ans));
+          selectedIds.length === correctIds.length &&
+          selectedIds.every((id) => correctIds.includes(id));
         if (isGood) {
           sc++;
-          pts += updatedTimers[i] || 0;
+          // Points inversement proportionnels au temps écoulé (plus rapide = plus de points)
+          pts += Math.max(1, 16 - (updatedTimers[i] || 1));
         }
       });
       setScore(sc);
@@ -257,9 +324,9 @@ const QuizPage: React.FC = () => {
             const questionIsCorrect =
               r.selected.length === r.correct.length &&
               r.selected.every((ans) => r.correct.includes(ans));
-            const savedTime = answerTimers[idx] || 0;
-            const pts = questionIsCorrect ? savedTime : 0;
-            const time = 15 - savedTime + 1;
+            const savedTime = answerTimers[idx] || 0; // Temps écoulé pour répondre
+            const pts = questionIsCorrect ? Math.max(1, 16 - savedTime) : 0; // Plus rapide = plus de points
+            const time = savedTime; // Affiche le temps écoulé
             return (
               <div key={r.questionId} className="mb-4">
                 <div className="fw-bold mb-2">
@@ -452,16 +519,19 @@ const QuizPage: React.FC = () => {
         <div className="mb-4 fs-4 text-center">{q.intitule}</div>
         {media}
         <div className="mb-4">
-          {q.options.map((opt) => (
-            <button
-              key={opt}
-              className={`btn w-100 mb-2 ${selected.includes(opt) ? "btn-bg-theme" : "btn-outline-gold"}`}
-              style={{ fontWeight: 600, fontSize: 18 }}
-              onClick={() => handleSelect(opt)}
-            >
-              {opt}
-            </button>
-          ))}
+          {q.options.map((opt, idx) => {
+            const optionId = q.optionIds[idx];
+            return (
+              <button
+                key={opt}
+                className={`btn w-100 mb-2 ${selected.includes(optionId) ? "btn-bg-theme" : "btn-outline-gold"}`}
+                style={{ fontWeight: 600, fontSize: 18 }}
+                onClick={() => handleSelect(opt)}
+              >
+                {opt}
+              </button>
+            );
+          })}
         </div>
         <div className="text-end">
           <button className="btn btn-bg-theme" onClick={handleNext}>

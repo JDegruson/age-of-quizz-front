@@ -190,3 +190,35 @@ export const uploadAudio = async (file: File, jwt?: string) => {
     throw error;
   }
 };
+
+export const submitAnswers = async (
+  answers: {
+    questionId: number;
+    answerIds: number[];
+    responseTimeSeconds: number;
+  }[],
+  jwt?: string,
+) => {
+  try {
+    const headers = jwt
+      ? {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+        }
+      : {
+          "Content-Type": "application/json",
+        };
+    const payload = {
+      userAnswerRequests: answers,
+    };
+    const response = await axios.post(
+      `${API_URL}/questions/submit-answers`,
+      payload,
+      { headers },
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error submitting answers:", error);
+    throw error;
+  }
+};
