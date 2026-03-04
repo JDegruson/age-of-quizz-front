@@ -52,6 +52,13 @@ const Navbar: React.FC = () => {
                     </Link>
                   </li>
                 )}
+                {isReviewer && (
+                  <li className="nav-item">
+                    <Link className="nav-link" to="/export-civ-data">
+                      Export JSON Excel
+                    </Link>
+                  </li>
+                )}
               </>
             )}
           </ul>

@@ -18,6 +18,7 @@ import UserProfilePage from "./pages/UserProfilePage";
 
 import QuizPage from "./pages/QuizPage";
 import ReviewQuestionsPage from "./pages/ReviewQuestionsPage";
+import ExportCivDataPage from "./pages/ExportCivDataPage";
 
 import { AuthProvider } from "./components/Context/AuthContext";
 import { UserProvider } from "./components/Context/UserContext";
@@ -67,6 +68,7 @@ export default function App() {
             <Route path="/profile" element={<UserProfilePage />} />
 
             <Route path="/review-questions" element={<ReviewQuestionsPage />} />
+            <Route path="/export-civ-data" element={<ExportCivDataPage />} />
             <Route path="/play" element={<ChooseGameModePage />} />
             <Route path="/quizz/solo" element={<SoloQuizStartPage />} />
             <Route path="/quiz" element={<QuizPage />} />

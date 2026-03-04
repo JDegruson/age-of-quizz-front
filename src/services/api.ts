@@ -222,3 +222,33 @@ export const submitAnswers = async (
     throw error;
   }
 };
+
+export const exportCivJsonToCsv = async (json: string, jwt?: string) => {
+  try {
+    const headers = jwt
+      ? {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+        }
+      : {
+          "Content-Type": "application/json",
+        };
+
+    const response = await axios.post(`${API_URL}/data/civ`, json, {
+      headers,
+      responseType: "blob",
+    });
+
+    const contentDisposition = response.headers["content-disposition"] as
+      | string
+      | undefined;
+
+    return {
+      blob: response.data as Blob,
+      filename: contentDisposition,
+    };
+  } catch (error) {
+    console.error("Error exporting civ data:", error);
+    throw error;
+  }
+};
