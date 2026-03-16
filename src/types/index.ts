@@ -12,19 +12,11 @@ export interface Question {
   status?: string;
   civilisation?: string;
   building?: string;
-  fileUrl?: string;
+  fileUrl?: string | null;
   authorUsername?: string;
   answers?: Answer[];
-  // Anciennes propriétés pour compatibilité
-  questionText?: string;
-  options?: string[];
-  correctAnswer?: string;
-  createdBy?: {
-    id: number;
-    username: string;
-  };
   createdAt?: string;
-  updatedAt?: string;
+  modifiedAt?: string;
 }
 
 export interface FormData {

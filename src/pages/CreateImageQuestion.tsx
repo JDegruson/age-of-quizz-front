@@ -16,6 +16,7 @@ export default function CreateImageQuestion() {
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [answers, setAnswers] = useState(["", "", "", ""]);
   const [correctIndices, setCorrectIndices] = useState<number[]>([]);
+  const [explication, setExplication] = useState("");
   const [loading, setLoading] = useState(false);
 
   const getImageDimensions = (file: File) =>
@@ -93,6 +94,7 @@ export default function CreateImageQuestion() {
           civilization === "NONE" ? "NONE" : CIVILIZATIONS_MAP[civilization],
         building: building || "NONE",
         libelle: "A quoi correspond cette image",
+        explication: explication.trim() || undefined,
         fileUrl: serverImagePath, // Le chemin retourné par le serveur
         type: "IMAGE",
         answers: answers
@@ -202,6 +204,17 @@ export default function CreateImageQuestion() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="mb-3">
+              <label className="form-label">Explication</label>
+              <textarea
+                value={explication}
+                onChange={(e) => setExplication(e.target.value)}
+                className="form-control"
+                placeholder="Explication optionnelle..."
+                rows={3}
+              />
             </div>
 
             <div className="mb-4">

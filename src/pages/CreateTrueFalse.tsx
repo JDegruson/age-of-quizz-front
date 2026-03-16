@@ -15,6 +15,7 @@ export default function CreateTrueFalse() {
   const [civilization, setCivilization] = useState("NONE");
   const [building, setBuilding] = useState("NONE");
   const [answer, setAnswer] = useState(true);
+  const [explication, setExplication] = useState("");
   const [loading, setLoading] = useState(false);
 
   async function handleSave() {
@@ -33,6 +34,7 @@ export default function CreateTrueFalse() {
         civilization === "NONE" ? "NONE" : CIVILIZATIONS_MAP[civilization],
       building: building || "NONE",
       libelle: title,
+      explication: explication.trim() || undefined,
       type: "TRUE_FALSE",
       answers: [
         {
@@ -60,6 +62,7 @@ export default function CreateTrueFalse() {
       setLoading(false);
       // Réinitialiser le formulaire
       setTitle("");
+      setExplication("");
       setCivilization("NONE");
       setBuilding("NONE");
       setAnswer(true);
@@ -153,6 +156,17 @@ export default function CreateTrueFalse() {
                 onChange={(e) => setTitle(e.target.value)}
                 className="form-control"
                 placeholder="Entrez votre question..."
+              />
+            </div>
+
+            <div className="mb-4">
+              <label className="form-label">Explication</label>
+              <textarea
+                value={explication}
+                onChange={(e) => setExplication(e.target.value)}
+                className="form-control"
+                placeholder="Explication optionnelle"
+                rows={3}
               />
             </div>
 

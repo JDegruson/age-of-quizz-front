@@ -10,11 +10,13 @@ import "react-toastify/dist/ReactToastify.css";
 export default function CreateSoundQuestion() {
   const navigate = useNavigate();
   const { user } = useUser();
+  const [theme, setTheme] = useState("TECH_TREE");
   const [civilization, setCivilization] = useState("NONE");
   const [building, setBuilding] = useState("NONE");
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [answers, setAnswers] = useState(["", "", "", ""]);
   const [correctIndices, setCorrectIndices] = useState<number[]>([]);
+  const [explication, setExplication] = useState("");
   const [loading, setLoading] = useState(false);
 
   function setAnswerAt(index: number, value: string) {
@@ -70,6 +72,7 @@ export default function CreateSoundQuestion() {
           civilization === "NONE" ? "NONE" : CIVILIZATIONS_MAP[civilization],
         building: building || "NONE",
         libelle: "A quoi correspond ce son",
+        explication: explication.trim() || undefined,
         fileUrl: serverAudioPath, // Le chemin retourné par le serveur
         type: "SOUND",
         answers: answers
@@ -166,6 +169,17 @@ export default function CreateSoundQuestion() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            <div className="mb-3">
+              <label className="form-label">Explication</label>
+              <textarea
+                value={explication}
+                onChange={(e) => setExplication(e.target.value)}
+                className="form-control"
+                placeholder="Explication optionnelle..."
+                rows={3}
+              />
             </div>
 
             <div className="mb-4">

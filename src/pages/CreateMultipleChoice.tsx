@@ -16,6 +16,7 @@ export default function CreateMultipleChoice() {
   const [building, setBuilding] = useState("NONE");
   const [answers, setAnswers] = useState(["", "", "", ""]);
   const [correctIndices, setCorrectIndices] = useState<number[]>([]);
+  const [explication, setExplication] = useState("");
   const [loading, setLoading] = useState(false);
 
   function setAnswerAt(index: number, value: string) {
@@ -76,6 +77,7 @@ export default function CreateMultipleChoice() {
         civilization === "NONE" ? "NONE" : CIVILIZATIONS_MAP[civilization],
       building: building || "NONE",
       libelle: title,
+      explication: explication.trim() || undefined,
       type: "MULTIPLE",
       answers: answers
         .map((value, index) => ({
@@ -99,6 +101,7 @@ export default function CreateMultipleChoice() {
       setLoading(false);
       // Réinitialiser le formulaire
       setTitle("");
+      setExplication("");
       setCivilization("NONE");
       setBuilding("NONE");
       setAnswers(["", "", "", ""]);
@@ -191,6 +194,17 @@ export default function CreateMultipleChoice() {
                 onChange={(e) => setTitle(e.target.value)}
                 className="form-control"
                 placeholder="Qu'est ce qui est petit et marron ?"
+              />
+            </div>
+
+            <div className="mb-3">
+              <label className="form-label">Explication</label>
+              <textarea
+                value={explication}
+                onChange={(e) => setExplication(e.target.value)}
+                className="form-control"
+                placeholder="Explication optionnelle pour les bonnes réponses"
+                rows={3}
               />
             </div>
 

@@ -96,14 +96,7 @@ const ReviewQuestionsPage: React.FC = () => {
           value: answer.value || "",
           correct: Boolean(answer.correct),
         }))
-      : question.options?.length
-        ? question.options.map((option) => ({
-            value: option,
-            correct: option === question.correctAnswer,
-          }))
-        : question.correctAnswer
-          ? [{ value: question.correctAnswer, correct: true }]
-          : [];
+      : [];
 
     const normalizedAnswers =
       question.type === "TRUE_FALSE"
@@ -134,12 +127,12 @@ const ReviewQuestionsPage: React.FC = () => {
 
     return {
       id: question.id,
-      libelle: question.libelle || question.questionText || "",
+      libelle: question.libelle || "",
       theme: question.theme || "TECH_TREE",
       civilisation: question.civilisation || "NONE",
       building: question.building || "NONE",
       type: question.type || "MULTIPLE",
-      fileUrl: question.fileUrl,
+      fileUrl: question.fileUrl || undefined,
       answers: normalizedAnswers,
     };
   };
@@ -303,8 +296,8 @@ const ReviewQuestionsPage: React.FC = () => {
   });
 
   const sortedQuestions = [...filteredQuestions].sort((a, b) => {
-    const aDate = a.updatedAt || a.createdAt;
-    const bDate = b.updatedAt || b.createdAt;
+    const aDate = a.modifiedAt || a.createdAt;
+    const bDate = b.modifiedAt || b.createdAt;
     const aTime = aDate ? new Date(aDate).getTime() : 0;
     const bTime = bDate ? new Date(bDate).getTime() : 0;
     return dateSort === "DESC" ? bTime - aTime : aTime - bTime;
@@ -533,9 +526,7 @@ const ReviewQuestionsPage: React.FC = () => {
                       color: "#e5e7eb",
                     }}
                   >
-                    {question.libelle ||
-                      question.questionText ||
-                      "(Pas d'intitulé)"}
+                    {question.libelle || "(Pas d'intitulé)"}
                   </h3>
                   {question.type && (
                     <p style={{ fontSize: "14px", color: "#9ca3af" }}>
@@ -983,16 +974,13 @@ const ReviewQuestionsPage: React.FC = () => {
                       gap: "12px",
                     }}
                   >
-                    {(question.authorUsername || question.createdBy) && (
+                    {question.authorUsername && (
                       <div>
                         <span style={{ color: "#9ca3af", fontWeight: "600" }}>
                           Auteur:{" "}
                         </span>
                         <span style={{ color: "#e5e7eb" }}>
-                          {question.authorUsername ||
-                            question.createdBy?.username}
-                          {question.createdBy?.id &&
-                            ` (ID: ${question.createdBy.id})`}
+                          {question.authorUsername}
                         </span>
                       </div>
                     )}
@@ -1136,20 +1124,20 @@ const ReviewQuestionsPage: React.FC = () => {
                         </span>
                       </div>
                     )}
-                    {question.updatedAt && (
+                    {question.modifiedAt && (
                       <div>
                         <span style={{ color: "#9ca3af", fontWeight: "600" }}>
                           Dernière modification:
                         </span>
                         <span style={{ color: "#e5e7eb" }}>
                           {" "}
-                          {new Date(question.updatedAt).toLocaleString("fr-FR")}
+                          {new Date(question.modifiedAt).toLocaleString(
+                            "fr-FR",
+                          )}
                         </span>
                       </div>
                     )}
 
-                    {/* Réponses/Options */}
-                    {/* Affichage des réponses, fallback si answers absent */}
                     {question.answers && question.answers.length > 0 ? (
                       <div>
                         <span
@@ -1197,66 +1185,6 @@ const ReviewQuestionsPage: React.FC = () => {
                             </li>
                           ))}
                         </ul>
-                      </div>
-                    ) : question.options && question.options.length > 0 ? (
-                      <div>
-                        <span
-                          style={{
-                            color: "#9ca3af",
-                            fontWeight: "600",
-                            display: "block",
-                            marginBottom: "8px",
-                          }}
-                        >
-                          Réponses proposées ({question.options.length}):
-                        </span>
-                        <ul
-                          style={{ listStyle: "none", padding: 0, margin: 0 }}
-                        >
-                          {question.options.map((option, index) => (
-                            <li
-                              key={index}
-                              style={{
-                                padding: "8px 12px",
-                                marginBottom: "6px",
-                                backgroundColor:
-                                  option === question.correctAnswer
-                                    ? "#065f46"
-                                    : "#374151",
-                                borderRadius: "4px",
-                                fontSize: "14px",
-                                color: "#e5e7eb",
-                                border:
-                                  option === question.correctAnswer
-                                    ? "2px solid #34d399"
-                                    : "none",
-                              }}
-                            >
-                              {option}
-                              {option === question.correctAnswer && (
-                                <span
-                                  style={{
-                                    color: "#34d399",
-                                    fontWeight: "bold",
-                                    marginLeft: "8px",
-                                  }}
-                                >
-                                  ✓ Réponse correcte
-                                </span>
-                              )}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    ) : question.correctAnswer ? (
-                      <div>
-                        <span style={{ color: "#9ca3af", fontWeight: "600" }}>
-                          Réponse correcte:
-                        </span>
-                        <span style={{ color: "#34d399", fontWeight: "bold" }}>
-                          {" "}
-                          {question.correctAnswer}
-                        </span>
                       </div>
                     ) : (
                       <div style={{ color: "#f87171", marginTop: 8 }}>
