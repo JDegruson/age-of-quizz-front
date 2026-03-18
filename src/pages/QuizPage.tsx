@@ -242,12 +242,8 @@ const QuizPage: React.FC = () => {
       try {
         // Submit answers to backend
         const jwt = user?.jwt;
-        if (!jwt) {
-          console.warn("JWT not found, skipping answer submission");
-        } else {
-          await submitAnswers(submitData, jwt);
-          console.log("Answers submitted successfully");
-        }
+        await submitAnswers(submitData, jwt);
+        console.log("Answers submitted successfully");
       } catch (error) {
         console.error("Error submitting answers:", error);
         // Continue to show correction even if submission fails
