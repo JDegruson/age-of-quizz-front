@@ -11,6 +11,7 @@ const Navbar: React.FC = () => {
   const isAuthor = user?.roles?.some(
     (role) => role.name === "AUTHOR" || role.name === "ADMIN",
   );
+  const isNotAuthor = user && !isAuthor;
   const isReviewer = user?.roles?.some(
     (role) => role.name === "REVIEWER" || role.name === "ADMIN",
   );
@@ -38,6 +39,13 @@ const Navbar: React.FC = () => {
           <ul className="navbar-nav me-auto">
             {user && (
               <>
+                {isNotAuthor && (
+                  <li className="nav-item">
+                    <Link className="nav-link" to="/become-author">
+                      Devenir auteur
+                    </Link>
+                  </li>
+                )}
                 {isAuthor && (
                   <li className="nav-item">
                     <Link className="nav-link" to="/create-question">
