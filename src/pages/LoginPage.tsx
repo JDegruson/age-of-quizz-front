@@ -6,6 +6,50 @@ import { useAuth } from "../components/Context/AuthContext";
 import { useUser } from "../components/Context/UserContext";
 import { BACKEND_URL } from "../config";
 
+const extractBackendMessage = (data: unknown): string => {
+  if (typeof data === "string") {
+    return data.trim();
+  }
+
+  if (data && typeof data === "object") {
+    const payload = data as Record<string, unknown>;
+    const candidateKeys = ["message", "error", "details"] as const;
+
+    for (const key of candidateKeys) {
+      const value = payload[key];
+      if (typeof value === "string" && value.trim()) {
+        return value.trim();
+      }
+    }
+  }
+
+  return "";
+};
+
+const buildLoginError = (message: string, status?: number) => {
+  const normalizedMessage =
+    message || "Une erreur est survenue lors de la connexion.";
+  const shouldShowForgotPassword =
+    status === 401 ||
+    /mot de passe|password|identifiant|utilisateur|credentials/i.test(
+      normalizedMessage,
+    );
+
+  if (!shouldShowForgotPassword) {
+    return normalizedMessage;
+  }
+
+  return (
+    <>
+      {normalizedMessage}
+      <br />
+      <a href="/ask-mail" className="text-decoration-underline">
+        Mot de passe oublié ?
+      </a>
+    </>
+  );
+};
+
 const LoginPage: React.FC = () => {
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
@@ -17,6 +61,7 @@ const LoginPage: React.FC = () => {
   const { user, setUser } = useUser();
   const handleLogin = async (event: React.FormEvent) => {
     event.preventDefault();
+    setError(null);
     const credentials = { username, password };
 
     try {
@@ -37,32 +82,12 @@ const LoginPage: React.FC = () => {
       login(); // ✅ Met à jour l'état global
     } catch (error) {
       if (axios.isAxiosError(error)) {
-        if (error.response?.status === 401) {
-          setError(
-            <>
-              Utilisateur ou mot de passe erroné.
-              <br />
-              <a href="/ask-mail" className="text-decoration-underline">
-                Mot de passe oublié ?
-              </a>
-            </>,
-          );
-        } else if (error.response?.data === "Profil utilisateur non trouvé") {
-          setError(
-            <>
-              Utilisateur ou mot de passe erroné.
-              <br />
-              <a href="/ask-mail" className="text-decoration-underline">
-                Mot de passe oublié ?
-              </a>
-            </>,
-          );
-        } else {
-          setError("Une erreur est survenue.");
-        }
-      } else {
-        setError("Une erreur est survenue.");
+        const backendMessage = extractBackendMessage(error.response?.data);
+        setError(buildLoginError(backendMessage, error.response?.status));
+        return;
       }
+
+      setError("Une erreur est survenue lors de la connexion.");
     }
   };
   useEffect(() => {

@@ -38,6 +38,7 @@ const ReviewQuestionsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("ALL");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
+  const [civilFilter, setCivilFilter] = useState<string>("ALL");
   const [dateSort, setDateSort] = useState<string>("DESC");
   const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(
     null,
@@ -292,7 +293,9 @@ const ReviewQuestionsPage: React.FC = () => {
   const filteredQuestions = questions.filter((q) => {
     const matchesStatus = filter === "ALL" || q.status === filter;
     const matchesType = typeFilter === "ALL" || q.type === typeFilter;
-    return matchesStatus && matchesType;
+    const matchesCivil =
+      civilFilter === "ALL" || (q.civilisation || "NONE") === civilFilter;
+    return matchesStatus && matchesType && matchesCivil;
   });
 
   const sortedQuestions = [...filteredQuestions].sort((a, b) => {
@@ -465,7 +468,38 @@ const ReviewQuestionsPage: React.FC = () => {
                 color: "#e5e7eb",
               }}
             >
-              Trier par date (modif/crea):
+              Filtrer par civilisation:
+            </label>
+            <select
+              value={civilFilter}
+              onChange={(e) => setCivilFilter(e.target.value)}
+              style={{
+                padding: "8px 16px",
+                borderRadius: "4px",
+                border: "1px solid #4b5563",
+                fontSize: "14px",
+                backgroundColor: "#374151",
+                color: "#e5e7eb",
+              }}
+            >
+              <option value="ALL">Toutes les civilisations</option>
+              <option value="NONE">Aucune</option>
+              {Object.entries(CIVILIZATIONS_MAP).map(([label, value]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label
+              style={{
+                marginRight: "10px",
+                fontWeight: "bold",
+                color: "#e5e7eb",
+              }}
+            >
+              Trier par date:
             </label>
             <select
               value={dateSort}

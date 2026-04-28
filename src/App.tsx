@@ -1,6 +1,7 @@
 import SoloQuizStartPage from "./pages/SoloQuizStartPage";
 import ChooseGameModePage from "./pages/ChooseGameModePage";
 import BecomeAuthorPage from "./pages/BecomeAuthorPage";
+import VerifyEmailPage from "./pages/VerifyEmailPage";
 import React from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import Home from "./pages/Home";
@@ -70,6 +71,7 @@ export default function App() {
 
             <Route path="/review-questions" element={<ReviewQuestionsPage />} />
             <Route path="/export-civ-data" element={<ExportCivDataPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
             <Route path="/become-author" element={<BecomeAuthorPage />} />
             <Route path="/play" element={<ChooseGameModePage />} />
             <Route path="/quizz/solo" element={<SoloQuizStartPage />} />

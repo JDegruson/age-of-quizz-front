@@ -3,6 +3,26 @@ import { useNavigate } from "react-router-dom";
 import { User } from "../components/UserProfile/interfaces";
 import { BACKEND_URL } from "../config";
 
+const extractBackendMessage = (payload: unknown): string => {
+  if (typeof payload === "string") {
+    return payload.trim();
+  }
+
+  if (payload && typeof payload === "object") {
+    const errorPayload = payload as Record<string, unknown>;
+    const candidateKeys = ["message", "error", "details"] as const;
+
+    for (const key of candidateKeys) {
+      const value = errorPayload[key];
+      if (typeof value === "string" && value.trim()) {
+        return value.trim();
+      }
+    }
+  }
+
+  return "";
+};
+
 const RegisterPage = () => {
   const navigate = useNavigate();
   const [user, setUser] = useState<User>({
@@ -25,14 +45,15 @@ const RegisterPage = () => {
   });
 
   const [error, setError] = useState<string | null>(null);
-  const [usernameError, setUsernameError] = useState(false);
-  const [pseudoError, setPseudoError] = useState(false);
-  const [emailError, setEmailError] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+  const [pseudoError, setPseudoError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState(false);
   const [confirmPassword, setConfirmPassword] = useState("");
   const [confirmError, setConfirmError] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -57,12 +78,12 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    setUsernameError(false);
-    setPseudoError(false);
+    setUsernameError(null);
+    setPseudoError(null);
     setPasswordError(false);
-    setEmailError(false);
+    setEmailError(null);
     setConfirmError(false);
-    setError("");
+    setError(null);
 
     if (user.password.length < 6) {
       setPasswordError(true);
@@ -74,6 +95,7 @@ const RegisterPage = () => {
     }
 
     try {
+      setIsLoading(true);
       const cleanedUser = trimUserFields(user);
 
       const response = await fetch(`${BACKEND_URL}/register`, {
@@ -84,26 +106,50 @@ const RegisterPage = () => {
         body: JSON.stringify(cleanedUser),
       });
       if (!response.ok) {
-        throw new Error(`Erreur ${response.status}: ${await response.text()}`);
+        const rawMessage = await response.text();
+        const backendMessage = extractBackendMessage(rawMessage);
+
+        if (backendMessage.includes("UserWithSamePseudoExistException")) {
+          setPseudoError("Ce pseudo Age of Quizz est déjà utilisé.");
+        } else if (
+          backendMessage.includes("UserWithSameUsernameExistException")
+        ) {
+          setUsernameError("Cet identifiant est déjà utilisé.");
+        } else if (/email/i.test(backendMessage)) {
+          setEmailError(
+            backendMessage || "Cette adresse mail est déjà utilisée.",
+          );
+        } else {
+          setError(
+            backendMessage || "Une erreur est survenue lors de l'inscription.",
+          );
+        }
+
+        setIsLoading(false);
+        return;
       }
+
+      setIsLoading(false);
       alert("Inscription réussie !");
       navigate("/login");
     } catch (error: any) {
+      setIsLoading(false);
       const message = error.message || error.toString();
       if (message.includes("UserWithSamePseudoExistException")) {
-        setPseudoError(true);
-        setUsernameError(false);
-        setEmailError(false);
+        setPseudoError("Ce pseudo Age of Quizz est déjà utilisé.");
+        setUsernameError(null);
+        setEmailError(null);
       } else if (message.includes("UserWithSameUsernameExistException")) {
-        setUsernameError(true);
-        setPseudoError(true);
-        setEmailError(false);
+        setUsernameError("Cet identifiant est déjà utilisé.");
+        setPseudoError(null);
+        setEmailError(null);
       } else if (message.includes("email")) {
-        setUsernameError(false);
-        setPseudoError(false);
+        setUsernameError(null);
+        setPseudoError(null);
+        setEmailError(message);
       } else {
-        setError("Une erreur est survenue");
-        setPseudoError(false);
+        setError(message || "Une erreur est survenue lors de l'inscription.");
+        setPseudoError(null);
       }
     }
   };
@@ -151,9 +197,7 @@ const RegisterPage = () => {
                 id="username"
               />
               {usernameError && (
-                <div className="alert alert-danger mt-3">
-                  Cet identifiant est déjà utilisé.
-                </div>
+                <div className="alert alert-danger mt-3">{usernameError}</div>
               )}
             </div>
             <div className="mb-4">
@@ -171,9 +215,7 @@ const RegisterPage = () => {
                 id="pseudo"
               />
               {pseudoError && (
-                <div className="alert alert-danger mt-3">
-                  Ce pseudo Age of Quizz est déjà utilisé.
-                </div>
+                <div className="alert alert-danger mt-3">{pseudoError}</div>
               )}
             </div>
             <div className="mb-4 position-relative">
@@ -256,14 +298,27 @@ const RegisterPage = () => {
                 id="email"
               />
               {emailError && (
-                <div className="alert alert-danger mt-3">
-                  Cette adresse mail est déjà utilisée.
-                </div>
+                <div className="alert alert-danger mt-3">{emailError}</div>
               )}
             </div>
             {error && <div className="alert alert-danger mt-3">{error}</div>}
-            <button type="submit" className="btn btn-bg-theme">
-              S'inscrire
+            <button
+              type="submit"
+              className="btn btn-bg-theme"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <>
+                  <span
+                    className="spinner-border spinner-border-sm me-2"
+                    role="status"
+                    aria-hidden="true"
+                  ></span>
+                  Inscription en cours...
+                </>
+              ) : (
+                "S'inscrire"
+              )}
             </button>
           </form>
         </div>
