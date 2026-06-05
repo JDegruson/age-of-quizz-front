@@ -21,6 +21,8 @@ import UserProfilePage from "./pages/UserProfilePage";
 import QuizPage from "./pages/QuizPage";
 import ReviewQuestionsPage from "./pages/ReviewQuestionsPage";
 import ExportCivDataPage from "./pages/ExportCivDataPage";
+import MultiplayerRoomPage from "./pages/MultiplayerRoomPage";
+import MultiplayerOptionsPage from "./pages/MultiplayerOptionsPage";
 
 import { AuthProvider } from "./components/Context/AuthContext";
 import { UserProvider } from "./components/Context/UserContext";
@@ -75,6 +77,12 @@ export default function App() {
             <Route path="/become-author" element={<BecomeAuthorPage />} />
             <Route path="/play" element={<ChooseGameModePage />} />
             <Route path="/quizz/solo" element={<SoloQuizStartPage />} />
+            <Route
+              path="/quizz/multiplayer"
+              element={<MultiplayerOptionsPage />}
+            />
+            <Route path="/create-room" element={<MultiplayerRoomPage />} />
+            <Route path="/join-room" element={<MultiplayerRoomPage />} />
             <Route path="/quiz" element={<QuizPage />} />
           </Routes>
         </AuthProvider>

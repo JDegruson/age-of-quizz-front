@@ -24,3 +24,5 @@ export interface FormData {
   options: string[];
   correctAnswer: string;
 }
+
+export * from "./multiplayer";

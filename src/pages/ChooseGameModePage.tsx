@@ -25,15 +25,11 @@ const ChooseGameModePage: React.FC = () => {
           </button>
           <button
             className="btn btn-outline-gold fs-5 py-3 rounded-3 shadow-sm"
-            onClick={() => {}}
+            onClick={() => navigate("/quizz/multiplayer")}
             style={{ fontWeight: 600 }}
-            disabled
-            title="Bientôt disponible"
+            title="Mode multijoueur"
           >
-            Jouer à plusieurs{" "}
-            <span style={{ fontSize: 14, color: "#ce7c02", marginLeft: 8 }}>
-              (bientôt)
-            </span>
+            Jouer à plusieurs
           </button>
         </div>
         <div className="text-center mt-4">

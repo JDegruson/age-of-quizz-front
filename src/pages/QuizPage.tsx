@@ -3,8 +3,10 @@ import React, { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import BACKEND_URL from "../config";
-import { submitAnswers } from "../services/api";
+import { requestRematch, submitAnswers } from "../services/api";
 import { useUser } from "../components/Context/UserContext";
+import { GameRoomSocket, isGameRecapEvent } from "../services/gameRoomSocket";
+import type { GameEvent, GameRecapPayload } from "../types/multiplayer";
 
 // Types
 interface QuizQuestion {
@@ -27,6 +29,95 @@ interface QuizResult {
   intitule: string;
   options: string[];
 }
+
+interface LivePlayerScore {
+  userId: number;
+  username: string;
+  rank?: number;
+  score?: number;
+  points?: number;
+}
+
+type QuizLocationState = {
+  questions?: any[];
+  roomCode?: string;
+  gameRecap?: GameRecapPayload | GameEvent<GameRecapPayload>;
+};
+
+const extractGameRecap = (
+  locationState?: QuizLocationState,
+): GameRecapPayload | null => {
+  if (!locationState?.gameRecap) {
+    return null;
+  }
+
+  const rawRecap = locationState.gameRecap as
+    | GameRecapPayload
+    | GameEvent<GameRecapPayload>;
+
+  if ("data" in rawRecap && rawRecap.data && "session" in rawRecap.data) {
+    return rawRecap.data;
+  }
+
+  if ("session" in rawRecap) {
+    return rawRecap;
+  }
+
+  return null;
+};
+
+const extractQuestionsFromEvent = (event: GameEvent<unknown>) => {
+  const payload = event.data as any;
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.questions)) return payload.questions;
+  if (payload?.question) return [payload.question];
+  return null;
+};
+
+const extractQuestionsFromUnknown = (payload: any) => {
+  if (Array.isArray(payload)) return payload;
+  if (Array.isArray(payload?.questions)) return payload.questions;
+  if (payload?.question) return [payload.question];
+  if (Array.isArray(payload?.nextQuestions)) return payload.nextQuestions;
+  if (payload?.nextQuestion) return [payload.nextQuestion];
+  if (Array.isArray(payload?.data?.questions)) return payload.data.questions;
+  if (payload?.data?.question) return [payload.data.question];
+  return null;
+};
+
+const extractGameRecapFromUnknown = (payload: any) => {
+  if (!payload) {
+    return null;
+  }
+
+  if (payload?.session?.gameMode === "MULTIPLAYER") {
+    return payload as GameRecapPayload;
+  }
+
+  if (payload?.data?.session?.gameMode === "MULTIPLAYER") {
+    return payload.data as GameRecapPayload;
+  }
+
+  if (payload?.recap?.session?.gameMode === "MULTIPLAYER") {
+    return payload.recap as GameRecapPayload;
+  }
+
+  return null;
+};
+
+const extractLivePlayerResults = (event: GameEvent<unknown>) => {
+  const payload = event.data as any;
+  if (Array.isArray(payload)) {
+    return payload;
+  }
+  if (Array.isArray(payload?.playerResults)) {
+    return payload.playerResults;
+  }
+  if (Array.isArray(payload?.results?.playerResults)) {
+    return payload.results.playerResults;
+  }
+  return null;
+};
 
 function normalizeQuestions(rawQuestions: any[]): QuizQuestion[] {
   return (rawQuestions || []).map((q: any) => {
@@ -76,7 +167,7 @@ function normalizeQuestions(rawQuestions: any[]): QuizQuestion[] {
 
 const QuizPage: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
+  const location = useLocation() as { state?: QuizLocationState };
   const { user } = useUser();
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [current, setCurrent] = useState(0);
@@ -88,24 +179,76 @@ const QuizPage: React.FC = () => {
   const [questionPoints, setQuestionPoints] = useState<number[]>([]);
   const [answerTimers, setAnswerTimers] = useState<number[]>([]);
   const [results, setResults] = useState<QuizResult[]>([]);
+  const [multiplayerRecap, setMultiplayerRecap] =
+    useState<GameRecapPayload | null>(null);
+  const [isWaitingNextQuestion, setIsWaitingNextQuestion] = useState(false);
+  const [waitingElapsedSeconds, setWaitingElapsedSeconds] = useState(0);
+  const [liveScores, setLiveScores] = useState<LivePlayerScore[]>([]);
+  const [isRequestingRematch, setIsRequestingRematch] = useState(false);
+  const [rematchFeedback, setRematchFeedback] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [openRecapQuestionIndex, setOpenRecapQuestionIndex] = useState<
+    number | null
+  >(null);
   const audioRef = useRef<HTMLAudioElement>(null);
   const [audioBlobUrl, setAudioBlobUrl] = useState<string | null>(null);
   const [timer, setTimer] = useState(15);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const multiplayerSocketRef = useRef<GameRoomSocket | null>(null);
+  const multiplayerRoomCleanupRef = useRef<(() => void) | null>(null);
+  const waitingSinceRef = useRef<number | null>(null);
+  const isWaitingNextQuestionRef = useRef(false);
+  const roomCode = location.state?.roomCode;
+  const isMultiplayerQuestionFlow = Boolean(roomCode) && !multiplayerRecap;
+
+  const resolveParticipantId = () => {
+    if (user?.id !== undefined && user?.id !== null) {
+      return `user_${user.id}`;
+    }
+
+    const storageKey = "multiplayer_participant_id";
+    const fromStorage = window.sessionStorage.getItem(storageKey);
+    if (fromStorage) {
+      return fromStorage;
+    }
+
+    const generated = `anon_${Math.random().toString(36).slice(2, 10)}`;
+    window.sessionStorage.setItem(storageKey, generated);
+    return generated;
+  };
+
+  useEffect(() => {
+    isWaitingNextQuestionRef.current = isWaitingNextQuestion;
+  }, [isWaitingNextQuestion]);
+
+  const applyIncomingQuestion = (rawQuestions: any[]) => {
+    if (!rawQuestions || rawQuestions.length === 0) {
+      return;
+    }
+
+    const normalized = normalizeQuestions(rawQuestions);
+    setQuestions(normalized);
+    setCurrent(0);
+    setAnswers(Array(normalized.length).fill([]));
+    setAnswerTimers(Array(normalized.length).fill(0));
+    setIsWaitingNextQuestion(false);
+    waitingSinceRef.current = null;
+    setWaitingElapsedSeconds(0);
+    setTimer(15);
+  };
 
   // Avance automatique à la fin du timer
   useEffect(() => {
-    if (timer === 0 && !showCorrection) {
+    if (timer === 0 && !showCorrection && !isWaitingNextQuestion) {
       // Pour éviter les appels multiples
       setTimeout(() => {
-        if (timer === 0 && !showCorrection) {
+        if (timer === 0 && !showCorrection && !isWaitingNextQuestion) {
           handleNext();
         }
       }, 100);
     }
     // eslint-disable-next-line
-  }, [timer, showCorrection]);
+  }, [timer, showCorrection, isWaitingNextQuestion]);
   // Timer effect
   useEffect(() => {
     setTimer(15);
@@ -122,7 +265,7 @@ const QuizPage: React.FC = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [current, questions.length]);
+  }, [current, questions]);
 
   // Helper to extract file name from fileUrl
   const getFileName = (fileUrl?: string) => {
@@ -132,6 +275,13 @@ const QuizPage: React.FC = () => {
 
   // On mount, fetch questions (or get from location.state)
   useEffect(() => {
+    const recap = extractGameRecap(location.state);
+    if (recap?.session?.gameMode === "MULTIPLAYER") {
+      setMultiplayerRecap(recap);
+      setShowCorrection(true);
+      return;
+    }
+
     if (location.state && location.state.questions) {
       const normalized = normalizeQuestions(location.state.questions);
       setQuestions(normalized);
@@ -147,6 +297,153 @@ const QuizPage: React.FC = () => {
       });
     }
   }, [location.state]);
+
+  useEffect(() => {
+    if (!roomCode || multiplayerRecap) {
+      return;
+    }
+
+    const socket = new GameRoomSocket(user?.jwt);
+    multiplayerSocketRef.current = socket;
+
+    socket
+      .connect()
+      .then(() => {
+        multiplayerRoomCleanupRef.current = socket.subscribeRoomEvents(
+          roomCode,
+          (event) => {
+            if (isGameRecapEvent(event)) {
+              setMultiplayerRecap(event.data);
+              setShowCorrection(true);
+              setIsWaitingNextQuestion(false);
+              waitingSinceRef.current = null;
+              setWaitingElapsedSeconds(0);
+              return;
+            }
+
+            const rawQuestions = extractQuestionsFromEvent(event);
+            if (
+              rawQuestions &&
+              rawQuestions.length > 0 &&
+              (event.type === "NEW_QUESTION" ||
+                isWaitingNextQuestionRef.current)
+            ) {
+              applyIncomingQuestion(rawQuestions);
+              return;
+            }
+
+            if (event.type === "SCORES_UPDATED") {
+              const playerResults = extractLivePlayerResults(event);
+              if (playerResults) {
+                const normalized = playerResults
+                  .map((player: any) => ({
+                    userId: Number(player.userId ?? -1),
+                    username: String(
+                      player.username || `anon_${player.userId ?? -1}`,
+                    ),
+                    rank:
+                      typeof player.rank === "number" ? player.rank : undefined,
+                    score:
+                      typeof player.score === "number"
+                        ? player.score
+                        : undefined,
+                    points:
+                      typeof player.points === "number"
+                        ? player.points
+                        : undefined,
+                  }))
+                  .sort(
+                    (
+                      a: { rank: number; points: any },
+                      b: { rank: number; points: any },
+                    ) => {
+                      if (
+                        typeof a.rank === "number" &&
+                        typeof b.rank === "number"
+                      ) {
+                        return a.rank - b.rank;
+                      }
+                      return (b.points || 0) - (a.points || 0);
+                    },
+                  );
+                setLiveScores(normalized);
+              }
+              return;
+            }
+          },
+        );
+
+        const applyAnswerResult = (payload: any) => {
+          const recap = extractGameRecapFromUnknown(payload);
+          if (recap) {
+            setMultiplayerRecap(recap);
+            setShowCorrection(true);
+            setIsWaitingNextQuestion(false);
+            waitingSinceRef.current = null;
+            setWaitingElapsedSeconds(0);
+            return;
+          }
+
+          const maybeQuestions = extractQuestionsFromUnknown(payload);
+          if (
+            maybeQuestions &&
+            maybeQuestions.length > 0 &&
+            isWaitingNextQuestionRef.current
+          ) {
+            applyIncomingQuestion(maybeQuestions);
+          }
+        };
+
+        const unsubscribePublicAnswerResult =
+          socket.subscribeAnswerResultPublic(roomCode, (result) => {
+            applyAnswerResult(result as any);
+          });
+
+        const unsubscribePrivateAnswerResult =
+          socket.subscribeAnswerResultPrivate(roomCode, (result) => {
+            applyAnswerResult(result as any);
+          });
+
+        const roomCleanup = multiplayerRoomCleanupRef.current;
+        multiplayerRoomCleanupRef.current = () => {
+          roomCleanup?.();
+          unsubscribePublicAnswerResult();
+          unsubscribePrivateAnswerResult();
+        };
+      })
+      .catch((error) => {
+        console.error("Unable to subscribe to multiplayer room events", error);
+      });
+
+    return () => {
+      if (multiplayerRoomCleanupRef.current) {
+        multiplayerRoomCleanupRef.current();
+        multiplayerRoomCleanupRef.current = null;
+      }
+      multiplayerSocketRef.current?.disconnect();
+      multiplayerSocketRef.current = null;
+    };
+  }, [roomCode, user?.jwt, multiplayerRecap]);
+
+  useEffect(() => {
+    if (!isWaitingNextQuestion) {
+      setWaitingElapsedSeconds(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      if (!waitingSinceRef.current) {
+        return;
+      }
+      const elapsed = Math.max(
+        0,
+        Math.floor((Date.now() - waitingSinceRef.current) / 1000),
+      );
+      setWaitingElapsedSeconds(elapsed);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isWaitingNextQuestion]);
 
   // Fetch audio as blob for seeking
   useEffect(() => {
@@ -184,6 +481,10 @@ const QuizPage: React.FC = () => {
 
   // Handle answer selection
   const handleSelect = (optionText: string) => {
+    if (isWaitingNextQuestion) {
+      return;
+    }
+
     setAnswers((prev) => {
       const updated = [...prev];
       const q = questions[current];
@@ -205,10 +506,46 @@ const QuizPage: React.FC = () => {
 
   // Next question or show correction
   const handleNext = async () => {
+    if (isSubmitting || isWaitingNextQuestion) {
+      return;
+    }
+
     // Save the current timer value for this question before moving
     const updatedTimers = [...answerTimers];
     updatedTimers[current] = Math.max(1, 15 - timer); // Temps écoulé (1 à 15 secondes)
     setAnswerTimers(updatedTimers);
+
+    if (isMultiplayerQuestionFlow) {
+      const q = questions[current];
+      const selectedAnswerIds = answers[current] || [];
+      const participantId = resolveParticipantId();
+
+      setIsSubmitting(true);
+      try {
+        if (!roomCode || !multiplayerSocketRef.current) {
+          throw new Error("Multiplayer socket unavailable");
+        }
+
+        multiplayerSocketRef.current.sendAnswer(roomCode, {
+          answerIds: selectedAnswerIds,
+          participantId,
+          questionId: q.id,
+        });
+
+        setIsWaitingNextQuestion(true);
+        waitingSinceRef.current = Date.now();
+        setWaitingElapsedSeconds(0);
+        if (timerRef.current) {
+          clearInterval(timerRef.current);
+        }
+        setTimer(0);
+      } catch (error) {
+        console.error("Error submitting answers:", error);
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
 
     if (current < questions.length - 1) {
       setCurrent(current + 1);
@@ -273,8 +610,245 @@ const QuizPage: React.FC = () => {
     }
   };
 
+  const handleRequestRematch = async () => {
+    if (!roomCode) {
+      setRematchFeedback(
+        "Room code unavailable. Return to the multiplayer room and reconnect.",
+      );
+      return;
+    }
+
+    setIsRequestingRematch(true);
+    setRematchFeedback(null);
+    try {
+      await requestRematch(roomCode, user?.jwt);
+      setRematchFeedback("Rematch request sent.");
+    } catch (error) {
+      console.error("Rematch request failed", error);
+      setRematchFeedback("Rematch request failed. Please try again.");
+    } finally {
+      setIsRequestingRematch(false);
+    }
+  };
+
   // Correction view
   if (showCorrection) {
+    if (multiplayerRecap) {
+      const sortedPlayers = [...(multiplayerRecap.results?.playerResults || [])]
+        .sort((a, b) => a.rank - b.rank)
+        .map((player) => ({
+          ...player,
+          isCurrentUser:
+            player.userId === user?.id || player.username === user?.username,
+        }));
+      const playersByUsername = new Map(
+        sortedPlayers.map((player) => [player.username, player]),
+      );
+      const playersByUserId = new Map(
+        sortedPlayers.map((player) => [String(player.userId), player]),
+      );
+
+      const getPlayerLabel = (playerKey: string) => {
+        const byUsername = playersByUsername.get(playerKey);
+        if (byUsername) {
+          return byUsername.userId < 0
+            ? `${byUsername.username} (anonyme)`
+            : byUsername.username;
+        }
+
+        const byUserId = playersByUserId.get(playerKey);
+        if (byUserId) {
+          return byUserId.userId < 0
+            ? `${byUserId.username} (anonyme)`
+            : byUserId.username;
+        }
+
+        return playerKey;
+      };
+
+      const myPlayer = sortedPlayers.find((player) => player.isCurrentUser);
+
+      return (
+        <div className="container" style={{ maxWidth: 900, marginTop: 40 }}>
+          <div className="card p-4">
+            <h2 className="mb-2 text-center">Recap multijoueur</h2>
+            <div className="text-center mb-4" style={{ color: "#9ca3af" }}>
+              Session {multiplayerRecap.session.gameSessionId} |{" "}
+              {multiplayerRecap.session.questionCount} questions |{" "}
+              {multiplayerRecap.session.totalDuration}s
+            </div>
+
+            {myPlayer && (
+              <div
+                className="mb-4 p-3"
+                style={{
+                  border: "1px solid #374151",
+                  borderRadius: 8,
+                  backgroundColor: "#111827",
+                }}
+              >
+                <strong>Votre resultat:</strong> rang #{myPlayer.rank} | score{" "}
+                {myPlayer.score}/{myPlayer.totalQuestions} | {myPlayer.points}{" "}
+                points
+              </div>
+            )}
+
+            <h4 className="mb-3">Classement final</h4>
+            <div className="table-responsive mb-4">
+              <table className="table table-dark table-striped align-middle">
+                <thead>
+                  <tr>
+                    <th>Rang</th>
+                    <th>Joueur</th>
+                    <th>Score</th>
+                    <th>Points</th>
+                    <th>Precision</th>
+                    <th>Temps total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedPlayers.map((player) => (
+                    <tr
+                      key={`${player.username}-${player.userId}`}
+                      style={{
+                        backgroundColor: player.isCurrentUser
+                          ? "#1f2937"
+                          : undefined,
+                      }}
+                    >
+                      <td>{player.rank}</td>
+                      <td>
+                        {player.username}
+                        {player.userId < 0 ? " (anonyme)" : ""}
+                      </td>
+                      <td>
+                        {player.correctAnswers}/{player.totalQuestions}
+                      </td>
+                      <td>{player.points}</td>
+                      <td>{player.accuracy.toFixed(1)}%</td>
+                      <td>{player.totalTimeSeconds}s</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <h4 className="mb-3">Details par question</h4>
+            <div className="accordion" id="recapQuestions">
+              {(multiplayerRecap.questions || []).map((question, idx) => (
+                <div className="accordion-item" key={question.questionId}>
+                  <h2 className="accordion-header" id={`heading-${idx}`}>
+                    <button
+                      className={`accordion-button${
+                        openRecapQuestionIndex === idx ? "" : " collapsed"
+                      }`}
+                      type="button"
+                      onClick={() =>
+                        setOpenRecapQuestionIndex((prev) =>
+                          prev === idx ? null : idx,
+                        )
+                      }
+                      aria-expanded={openRecapQuestionIndex === idx}
+                      aria-controls={`collapse-${idx}`}
+                    >
+                      Q{idx + 1}. {question.questionText}
+                    </button>
+                  </h2>
+                  <div
+                    id={`collapse-${idx}`}
+                    className={`accordion-collapse collapse${
+                      openRecapQuestionIndex === idx ? " show" : ""
+                    }`}
+                    aria-labelledby={`heading-${idx}`}
+                    data-bs-parent="#recapQuestions"
+                    style={{
+                      display:
+                        openRecapQuestionIndex === idx ? "block" : "none",
+                    }}
+                  >
+                    <div className="accordion-body">
+                      <div className="table-responsive">
+                        <table className="table table-sm table-striped">
+                          <thead>
+                            <tr>
+                              <th>Joueur</th>
+                              <th>Choix</th>
+                              <th>Bonnes reponses</th>
+                              <th>Resultat</th>
+                              <th>Temps</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {Object.entries(question.playerResponses || {}).map(
+                              ([playerKey, response]) => (
+                                <tr key={playerKey}>
+                                  <td>{getPlayerLabel(playerKey)}</td>
+                                  <td>
+                                    {(response.selected || []).join(", ") ||
+                                      "-"}
+                                  </td>
+                                  <td>
+                                    {(response.correct || []).join(", ") || "-"}
+                                  </td>
+                                  <td
+                                    style={{
+                                      color: response.isCorrect
+                                        ? "#22c55e"
+                                        : "#ef4444",
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {response.isCorrect
+                                      ? "Correct"
+                                      : "Incorrect"}
+                                  </td>
+                                  <td>{response.timeSeconds}s</td>
+                                </tr>
+                              ),
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {multiplayerRecap.allowRematch && (
+              <div
+                className="mt-4 p-3"
+                style={{ backgroundColor: "#1f2937", borderRadius: 8 }}
+              >
+                <div className="mb-2">
+                  Rematch available ({multiplayerRecap.rematchExpireIn || 0}s)
+                </div>
+                <button
+                  className="btn btn-outline-gold"
+                  onClick={handleRequestRematch}
+                  disabled={isRequestingRematch}
+                >
+                  {isRequestingRematch ? "Sending..." : "Request rematch"}
+                </button>
+                {rematchFeedback && (
+                  <div className="mt-2" style={{ color: "#d1d5db" }}>
+                    {rematchFeedback}
+                  </div>
+                )}
+              </div>
+            )}
+
+            <button
+              className="btn btn-bg-theme w-100 mt-4"
+              onClick={() => navigate("/")}
+            >
+              Retour accueil
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     // If we've gone through all questions, show final summary
     if (correctionIndex >= results.length) {
       return (
@@ -588,7 +1162,50 @@ const QuizPage: React.FC = () => {
           Auteur : {q.authorName || "Inconnu"}
         </div>
         {media}
+        {isMultiplayerQuestionFlow && liveScores.length > 0 && (
+          <div
+            className="mb-3 p-3"
+            style={{ backgroundColor: "#111827", borderRadius: 8 }}
+          >
+            <div className="mb-2" style={{ color: "#d1d5db", fontWeight: 600 }}>
+              Classement live
+            </div>
+            <div style={{ color: "#9ca3af", fontSize: 14 }}>
+              {liveScores
+                .slice(0, 5)
+                .map((player) => {
+                  const rank =
+                    typeof player.rank === "number" ? `#${player.rank}` : "#-";
+                  const scoreText =
+                    typeof player.score === "number"
+                      ? `score ${player.score}`
+                      : "score -";
+                  const pointsText =
+                    typeof player.points === "number"
+                      ? `${player.points} pts`
+                      : "- pts";
+                  return `${rank} ${player.username}: ${scoreText}, ${pointsText}`;
+                })
+                .join(" | ")}
+            </div>
+          </div>
+        )}
         <div className="mb-4">
+          {isWaitingNextQuestion && (
+            <div
+              className="alert alert-info"
+              style={{ backgroundColor: "#1e3a5f", borderColor: "#3b82f6" }}
+            >
+              <span
+                className="spinner-border spinner-border-sm"
+                role="status"
+                aria-hidden="true"
+                style={{ marginRight: 8 }}
+              />
+              Reponse envoyee. En attente de la prochaine question... (
+              {waitingElapsedSeconds}s)
+            </div>
+          )}
           {q.options.map((opt, idx) => {
             const optionId = q.optionIds[idx];
             return (
@@ -597,6 +1214,7 @@ const QuizPage: React.FC = () => {
                 className={`btn w-100 mb-2 ${selected.includes(optionId) ? "btn-bg-theme" : "btn-outline-gold"}`}
                 style={{ fontWeight: 600, fontSize: 18 }}
                 onClick={() => handleSelect(opt)}
+                disabled={isWaitingNextQuestion || isSubmitting}
               >
                 {opt}
               </button>
@@ -604,10 +1222,20 @@ const QuizPage: React.FC = () => {
           })}
         </div>
         <div className="text-end">
-          <button className="btn btn-bg-theme" onClick={handleNext}>
-            {current === questions.length - 1
-              ? "Voir la correction"
-              : "Question suivante"}
+          <button
+            className="btn btn-bg-theme"
+            onClick={handleNext}
+            disabled={isSubmitting || isWaitingNextQuestion}
+          >
+            {isMultiplayerQuestionFlow
+              ? isSubmitting
+                ? "Validation..."
+                : isWaitingNextQuestion
+                  ? "En attente de la prochaine question..."
+                  : "Valider"
+              : current === questions.length - 1
+                ? "Voir la correction"
+                : "Question suivante"}
           </button>
         </div>
       </div>
