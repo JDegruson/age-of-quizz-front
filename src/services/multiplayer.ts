@@ -9,6 +9,7 @@ export interface CreateRoomRequest {
 
 export interface CreateRoomResponse {
   code: any;
+  participantId?: string;
 }
 
 export interface StartGameRequest {
@@ -18,6 +19,18 @@ export interface StartGameRequest {
 export interface ReadyRequest {
   participantId?: string;
   ready?: boolean;
+}
+
+export interface JoinRoomRequest {
+  code: string;
+  participantId?: string;
+  displayName?: string;
+}
+
+export interface JoinRoomResponse {
+  code: string;
+  players: string[];
+  participantId?: string;
 }
 
 export const createMultiplayerRoom = async (
@@ -61,6 +74,26 @@ export const startMultiplayerRoom = async (
     },
   );
 
+  return response.data;
+};
+
+export const joinMultiplayerRoom = async (
+  request: JoinRoomRequest,
+  jwt?: string,
+): Promise<JoinRoomResponse> => {
+  const headers = jwt
+    ? {
+        Authorization: `Bearer ${jwt}`,
+        "Content-Type": "application/json",
+      }
+    : {
+        "Content-Type": "application/json",
+      };
+  const response = await axios.post(
+    `${API_URL}/multiplayer/rooms/join`,
+    request,
+    { headers },
+  );
   return response.data;
 };
 

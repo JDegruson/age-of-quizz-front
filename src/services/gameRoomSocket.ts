@@ -142,28 +142,6 @@ export class GameRoomSocket {
     });
   }
 
-  sendJoinRoom(
-    roomCode: string,
-    payload?: { userId?: number; username?: string },
-  ) {
-    this.client.publish({
-      destination: `/app/room/${roomCode}/join`,
-      body: JSON.stringify({ roomCode, ...payload }),
-      headers: this.getAuthHeaders(),
-    });
-  }
-
-  sendPlayerReady(
-    roomCode: string,
-    payload?: { userId?: number; username?: string; ready?: boolean },
-  ) {
-    this.client.publish({
-      destination: `/app/room/${roomCode}/ready`,
-      body: JSON.stringify({ roomCode, ready: true, ...payload }),
-      headers: this.getAuthHeaders(),
-    });
-  }
-
   sendAnswer(roomCode: string, payload: RoomAnswerPayload) {
     this.client.publish({
       destination: `/app/room/${roomCode}/answer`,

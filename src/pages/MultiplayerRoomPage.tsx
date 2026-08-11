@@ -5,11 +5,15 @@ import { GameRoomSocket, isGameRecapEvent } from "../services/gameRoomSocket";
 import type { GameEvent } from "../types/multiplayer";
 import {
   createMultiplayerRoom,
+  joinMultiplayerRoom,
   setMultiplayerPlayerReady,
   startMultiplayerRoom,
 } from "../services/multiplayer";
 
 const normalizeRoomCode = (value: string) => value.trim().toUpperCase();
+
+const PARTICIPANT_ID_STORAGE_KEY = "multiplayer_participant_id";
+const PSEUDO_STORAGE_KEY = "multiplayer_pseudo";
 
 type LobbyPlayer = {
   userId: number;
@@ -37,6 +41,11 @@ const MultiplayerRoomPage: React.FC = () => {
   const connectedRoomCodeRef = useRef<string>("");
 
   const [roomCode, setRoomCode] = useState("");
+  const [pseudo, setPseudo] = useState(
+    () => window.localStorage.getItem(PSEUDO_STORAGE_KEY) || "",
+  );
+  const isAnonymous = !user?.username;
+  const trimmedPseudo = pseudo.trim();
   const [status, setStatus] = useState("Disconnected");
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
@@ -79,6 +88,36 @@ const MultiplayerRoomPage: React.FC = () => {
     if (Array.isArray(payload)) return payload;
     if (Array.isArray(payload?.questions)) return payload.questions;
     if (payload?.question) return [payload.question];
+    return null;
+  };
+
+  const requireDisplayName = (): string | null => {
+    if (user?.username) {
+      return user.username;
+    }
+    if (!trimmedPseudo) {
+      setError("Merci de choisir un pseudo avant de rejoindre une salle.");
+      return null;
+    }
+    window.localStorage.setItem(PSEUDO_STORAGE_KEY, trimmedPseudo);
+    return trimmedPseudo;
+  };
+
+  const resolveParticipantId = () => {
+    if (user?.id !== undefined && user?.id !== null) {
+      return `user_${user.id}`;
+    }
+
+    const fromStorage = window.sessionStorage.getItem(
+      PARTICIPANT_ID_STORAGE_KEY,
+    );
+    if (fromStorage) {
+      return fromStorage;
+    }
+
+    // No participantId yet: it must come from the backend (createRoom
+    // response) or from joining a room. Do not invent one locally, as it
+    // would never match the key the server stored the participant under.
     return null;
   };
 
@@ -183,7 +222,7 @@ const MultiplayerRoomPage: React.FC = () => {
       setStatus("Envoi du statut prêt...");
       await setMultiplayerPlayerReady(
         activeRoomCode,
-        { ready: true },
+        { ready: true, participantId: resolveParticipantId() ?? undefined },
         user?.jwt,
       );
       setIsReady(true);
@@ -223,7 +262,11 @@ const MultiplayerRoomPage: React.FC = () => {
       setIsStartingGame(true);
       setError(null);
       setStatus("Démarrage de la partie...");
-      await startMultiplayerRoom(activeRoomCode, {}, user?.jwt);
+      await startMultiplayerRoom(
+        activeRoomCode,
+        { participantId: resolveParticipantId() ?? undefined },
+        user?.jwt,
+      );
       setStatus("Partie lancée");
     } catch (startError) {
       console.error("Failed to start game", startError);
@@ -234,10 +277,18 @@ const MultiplayerRoomPage: React.FC = () => {
     }
   };
 
-  const handleConnect = async (codeOverride?: string) => {
+  const handleConnect = async (
+    codeOverride?: string,
+    options: { alreadyJoined?: boolean } = {},
+  ) => {
     const cleanedRoomCode = normalizeRoomCode(codeOverride ?? roomCode);
     if (!cleanedRoomCode) {
       setError("Please provide a room code.");
+      return;
+    }
+
+    const displayName = requireDisplayName();
+    if (!displayName) {
       return;
     }
 
@@ -246,6 +297,23 @@ const MultiplayerRoomPage: React.FC = () => {
     setStatus("Connexion en cours...");
 
     try {
+      if (!options.alreadyJoined) {
+        const joinResponse = await joinMultiplayerRoom(
+          {
+            code: cleanedRoomCode,
+            displayName,
+            participantId: resolveParticipantId() ?? undefined,
+          },
+          user?.jwt,
+        );
+        if (joinResponse.participantId) {
+          window.sessionStorage.setItem(
+            PARTICIPANT_ID_STORAGE_KEY,
+            joinResponse.participantId,
+          );
+        }
+      }
+
       disconnect();
       const socket = new GameRoomSocket(user?.jwt);
       socketRef.current = socket;
@@ -279,11 +347,6 @@ const MultiplayerRoomPage: React.FC = () => {
         cleanupFnsRef.current.push(privateAnswerCleanup);
       }
 
-      socket.sendJoinRoom(cleanedRoomCode, {
-        userId: user?.id,
-        username: user?.username,
-      });
-
       setIsConnected(true);
       setConnectedRoomCode(cleanedRoomCode);
       setStatus(`Connecté à la salle ${cleanedRoomCode}`);
@@ -307,19 +370,29 @@ const MultiplayerRoomPage: React.FC = () => {
       console.log("handleCreateRoom: déjà appelé, on ignore");
       return;
     }
+
+    const displayName = requireDisplayName();
+    if (!displayName) {
+      return;
+    }
+
     createRoomCalledRef.current = true;
     console.log("handleCreateRoom called", Date.now());
     setIsConnecting(true);
     setStatus("Création de la salle...");
     setError(null);
     try {
-      // Optionnel : displayName = username ou vide
-      const displayName = user?.username || undefined;
       const res = await createMultiplayerRoom({ displayName }, user?.jwt);
       const code = res?.code;
+      if (res?.participantId) {
+        window.sessionStorage.setItem(
+          PARTICIPANT_ID_STORAGE_KEY,
+          res.participantId,
+        );
+      }
       if (code) {
         setRoomCode(code);
-        await handleConnect(code);
+        await handleConnect(code, { alreadyJoined: true });
       } else {
         setError("Erreur lors de la création de la salle.");
         setStatus("Erreur création salle");
@@ -347,6 +420,23 @@ const MultiplayerRoomPage: React.FC = () => {
           Join a room to receive live game events.
         </p>
 
+        {isAnonymous && (
+          <div className="mb-3">
+            <label htmlFor="pseudo" className="form-label">
+              Pseudo
+            </label>
+            <input
+              id="pseudo"
+              className="form-control"
+              placeholder="Choisissez un pseudo"
+              value={pseudo}
+              onChange={(e) => setPseudo(e.target.value)}
+              disabled={isConnecting || isConnected}
+              maxLength={30}
+            />
+          </div>
+        )}
+
         <div className="mb-3">
           <label htmlFor="room-code" className="form-label">
             Room code
@@ -373,7 +463,9 @@ const MultiplayerRoomPage: React.FC = () => {
         >
           <div>Status: {status}</div>
           {lastEventType && <div>Last event: {lastEventType}</div>}
-          <div>Current user: {user?.username || "anonymous"}</div>
+          <div>
+            Current user: {user?.username || trimmedPseudo || "anonymous"}
+          </div>
           <div>Role: {isHost ? "Host" : "Player"}</div>
           {countdown !== null && <div>Countdown: {countdown}s</div>}
           {connectedRoomCode && <div>Room: {connectedRoomCode}</div>}
@@ -420,7 +512,9 @@ const MultiplayerRoomPage: React.FC = () => {
           <button
             className="btn btn-bg-theme flex-grow-1"
             onClick={() => handleConnect()}
-            disabled={isConnecting || isConnected}
+            disabled={
+              isConnecting || isConnected || (isAnonymous && !trimmedPseudo)
+            }
           >
             {isConnecting ? "Connecting..." : "Connect"}
           </button>
@@ -448,7 +542,9 @@ const MultiplayerRoomPage: React.FC = () => {
           <button
             className="btn btn-outline-primary"
             onClick={handleCreateRoom}
-            disabled={isConnecting || isConnected}
+            disabled={
+              isConnecting || isConnected || (isAnonymous && !trimmedPseudo)
+            }
           >
             Créer une salle
           </button>
