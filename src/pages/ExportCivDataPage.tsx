@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import React, { useState } from "react";
 import axios from "axios";
-import { useUser } from "../components/Context/UserContext";
-import { useAuth } from "../components/Context/AuthContext";
-import { exportCivJsonToCsv } from "../services/api";
-
+import { useUser } from "../context/UserContext";
+import { exportCivJsonToCsv } from "../services/dataExportApi";
+import Alert from "../components/ui/Alert";
+import Button from "../components/ui/Button";
+import Spinner from "../components/ui/Spinner";
+import { useRequireRole } from "../hooks/useRequireRole";
 const extractCivName = (jsonString: string): string | null => {
   try {
     const data = JSON.parse(jsonString);
@@ -84,26 +85,11 @@ const ExportCivDataPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const { user } = useUser();
-  const { isAuthenticated, isAuthLoading } = useAuth();
-  const navigate = useNavigate();
 
-  const hasReviewerRole = user?.roles?.some(
-    (role) => role.name === "REVIEWER" || role.name === "ADMIN",
+  const { hasRequiredRole: hasReviewerRole, isAuthLoading } = useRequireRole(
+    ["REVIEWER", "ADMIN"],
+    { loginMessage: "Connecte-toi pour accéder à l'export JSON vers Excel." },
   );
-
-  useEffect(() => {
-    if (!isAuthLoading) {
-      if (!isAuthenticated) {
-        navigate("/login", {
-          state: {
-            message: "Connecte-toi pour accéder à l'export JSON vers Excel.",
-          },
-        });
-      } else if (!hasReviewerRole) {
-        navigate("/");
-      }
-    }
-  }, [isAuthLoading, isAuthenticated, hasReviewerRole, navigate]);
 
   const handleExport = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -151,6 +137,7 @@ const ExportCivDataPage: React.FC = () => {
   if (isAuthLoading) {
     return (
       <div style={{ textAlign: "center", padding: "50px", color: "#e5e7eb" }}>
+        <Spinner label="Chargement..." className="mb-3" />
         <p>Chargement...</p>
       </div>
     );
@@ -161,7 +148,7 @@ const ExportCivDataPage: React.FC = () => {
   }
 
   return (
-    <div className="container" style={{ maxWidth: "900px" }}>
+    <div className="container page-xl mt-5">
       <div className="card bg-dark text-light border-secondary">
         <div className="card-body">
           <h2 className="card-title mb-3">Export JSON vers Excel (CSV)</h2>
@@ -192,16 +179,12 @@ const ExportCivDataPage: React.FC = () => {
               )}
             </div>
 
-            {error && <div className="alert alert-danger">{error}</div>}
-            {success && <div className="alert alert-success">{success}</div>}
+            {error && <Alert>{error}</Alert>}
+            {success && <Alert variant="success">{success}</Alert>}
 
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={isSubmitting}
-            >
+            <Button type="submit" variant="primary" disabled={isSubmitting}>
               {isSubmitting ? "Export en cours..." : "Exporter et télécharger"}
-            </button>
+            </Button>
           </form>
         </div>
       </div>

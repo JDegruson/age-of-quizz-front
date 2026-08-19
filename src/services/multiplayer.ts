@@ -121,3 +121,26 @@ export const setMultiplayerPlayerReady = async (
 
   return response.data;
 };
+
+export const requestRematch = async (roomCode: string, jwt?: string) => {
+  try {
+    const headers = jwt
+      ? {
+          Authorization: `Bearer ${jwt}`,
+          "Content-Type": "application/json",
+        }
+      : {
+          "Content-Type": "application/json",
+        };
+
+    const response = await axios.post(
+      `${API_URL}/room/${encodeURIComponent(roomCode)}/rematch`,
+      null,
+      { headers },
+    );
+    return response.data;
+  } catch (error) {
+    console.error("Error requesting rematch:", error);
+    throw error;
+  }
+};

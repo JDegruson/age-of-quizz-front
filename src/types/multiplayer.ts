@@ -84,3 +84,9 @@ export interface AnswerProcessingResult {
   responseTimeSeconds?: number;
   [key: string]: unknown;
 }
+export type LobbyPlayer = {
+  userId: number;
+  username: string;
+  ready: boolean;
+  avatar?: string | null;
+};

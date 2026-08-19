@@ -7,7 +7,7 @@ export const CIVILIZATIONS_MAP: Record<string, string> = {
   Bengalis: "BENGALIS",
   Berbères: "BERBERS",
   Bohémiens: "BOHEMIANS",
-  Britons: "BRITONS",
+  Britanniques: "BRITONS",
   Bulgares: "BULGARIANS",
   Bourguignons: "BURGUNDIANS",
   Birmans: "BURMESE",
@@ -69,5 +69,12 @@ export const CIVILIZATIONS_LABELS: Record<string, string> = Object.entries(
   },
   {} as Record<string, string>,
 );
+
+export const getCivilisationLabel = (civilisation?: string): string => {
+  if (!civilisation || civilisation === "NONE" || civilisation === "None") {
+    return "Aucune civilisation";
+  }
+  return CIVILIZATIONS_LABELS[civilisation] || civilisation;
+};
 
 export default CIVILIZATIONS;

@@ -1,9 +1,11 @@
 import React from "react";
+import Card from "../components/ui/Card";
+import LinkButton from "../components/ui/LinkButton";
 
 const BecomeAuthorPage: React.FC = () => {
   return (
-    <div className="container" style={{ maxWidth: "800px", marginTop: "80px" }}>
-      <div className="card shadow-lg p-5">
+    <div className="container page-md mt-5">
+      <Card padding="lg">
         <h1 className="text-center mb-4">
           <i className="bi bi-pencil-square me-2"></i>
           Devenir auteur
@@ -62,17 +64,18 @@ const BecomeAuthorPage: React.FC = () => {
         </div>
 
         <div className="text-center">
-          <a
+          <LinkButton
             href="https://discord.gg/bdHGsTD5Dg"
             target="_blank"
             rel="noopener noreferrer"
-            className="btn btn-lg btn-primary rounded-pill px-5 py-3 shadow"
+            variant="primary"
+            className="btn-lg rounded-pill px-5 py-3 shadow"
           >
             <i className="bi bi-discord me-2"></i>
             Rejoindre le Discord
-          </a>
+          </LinkButton>
         </div>
-      </div>
+      </Card>
     </div>
   );
 };

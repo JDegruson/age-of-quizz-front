@@ -1,8 +1,10 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useUser } from "./Context/UserContext";
-import { useAuth } from "./Context/AuthContext";
+import { useUser } from "../context/UserContext";
+import { useAuth } from "../context/AuthContext";
 import Logo from "./Logo";
+import Button from "./ui/Button";
+import LinkButton from "./ui/LinkButton";
 
 const Navbar: React.FC = () => {
   const { user, setUser } = useUser();
@@ -85,27 +87,32 @@ const Navbar: React.FC = () => {
                   </Link>
                 </li>
                 <li className="nav-item">
-                  <button
+                  <Button
                     onClick={handleLogout}
-                    className="btn btn-outline-light btn-sm"
+                    variant="outline-light"
+                    className="btn-sm"
                   >
                     <i className="bi bi-box-arrow-right me-2"></i>
                     Déconnexion
-                  </button>
+                  </Button>
                 </li>
               </>
             ) : (
               <>
                 <li className="nav-item me-2">
-                  <Link to="/register" className="btn btn-outline-light btn-sm">
+                  <LinkButton
+                    to="/register"
+                    variant="outline-light"
+                    className="btn-sm"
+                  >
                     Inscription
-                  </Link>
+                  </LinkButton>
                 </li>
                 <li className="nav-item">
-                  <Link to="/login" className="btn btn-primary btn-sm">
+                  <LinkButton to="/login" variant="primary" className="btn-sm">
                     <i className="bi bi-box-arrow-in-right me-2"></i>
                     Connexion
-                  </Link>
+                  </LinkButton>
                 </li>
               </>
             )}
