@@ -1,0 +1,16 @@
+User-agent: *
+# Pages privées ou sans intérêt pour la recherche
+# "$" = adresse exacte : sans lui, /quiz bloquerait aussi /quizz/solo
+Disallow: /quiz$
+# Ouvrir /create-room crée une salle : les robots ne doivent pas la visiter
+Disallow: /create-room
+Disallow: /join-room
+Disallow: /review-questions
+Disallow: /create-question
+Disallow: /export-civ-data
+Disallow: /daily-riddle-admin
+Disallow: /reset-password
+Disallow: /verify-email
+Disallow: /ask-mail
+
+Sitemap: https://ageofquizz.fr/sitemap.xml

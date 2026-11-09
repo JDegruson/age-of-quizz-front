@@ -15,7 +15,7 @@ interface QuestionMediaProps {
 
 /**
  * Affiche l'image ou l'audio d'une question selon son type. Partagé entre
- * QuestionView, SoloCorrectionView et QuestionDetails, qui dupliquaient
+ * QuestionView, le récapitulatif de fin de partie et QuestionDetails, qui dupliquaient
  * chacun ce branchement IMAGE/SOUND indépendamment.
  *
  * Ne rend que l'élément média lui-même (pas de div wrapper) — chaque

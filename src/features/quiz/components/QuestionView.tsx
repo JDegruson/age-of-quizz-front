@@ -11,6 +11,8 @@ interface QuestionViewProps {
   index: number;
   total: number;
   timer: number;
+  /** When true, `timer` is the elapsed time instead of the remaining time. */
+  isUnlimitedTime?: boolean;
   selectedOptionIds: number[];
   onSelect: (optionText: string) => void;
   onNext: () => void;
@@ -28,6 +30,7 @@ const QuestionView: React.FC<QuestionViewProps> = ({
   index,
   total,
   timer,
+  isUnlimitedTime = false,
   selectedOptionIds: selected,
   onSelect,
   onNext,
@@ -67,11 +70,13 @@ const QuestionView: React.FC<QuestionViewProps> = ({
           className="mb-3 text-center"
           style={{
             fontSize: 20,
-            color: timer <= 5 ? "#dc2626" : "#2563eb",
+            color: !isUnlimitedTime && timer <= 5 ? "#dc2626" : "#2563eb",
             fontWeight: 700,
           }}
         >
-          Temps restant : {timer}s
+          {isUnlimitedTime
+            ? `Temps écoulé : ${timer}s`
+            : `Temps restant : ${timer}s`}
         </div>
         <div className="mb-4 fs-4 text-center">{q.intitule}</div>
         <div className="mb-3 text-center" style={{ color: "#9ca3af" }}>
@@ -141,9 +146,18 @@ const QuestionView: React.FC<QuestionViewProps> = ({
           })}
         </div>
         <div className="text-end">
+          {selected.length === 0 && !isWaitingNextQuestion && (
+            <small className="me-3" style={{ color: "#9ca3af" }}>
+              Sélectionne au moins une réponse
+            </small>
+          )}
           <Button
             onClick={onNext}
-            disabled={isSubmitting || isWaitingNextQuestion}
+            // The countdown calls onNext directly on expiry, so an
+            // unanswered question still moves on when time runs out.
+            disabled={
+              isSubmitting || isWaitingNextQuestion || selected.length === 0
+            }
           >
             {isMultiplayer
               ? isSubmitting

@@ -45,6 +45,13 @@ const QuestionDetails: React.FC<QuestionDetailsProps> = ({
           </div>
         )}
 
+        {question.explication && (
+          <div>
+            <span style={LABEL_STYLE}>Explication: </span>
+            <span style={VALUE_STYLE}>{question.explication}</span>
+          </div>
+        )}
+
         {question.theme && (
           <div>
             <span style={LABEL_STYLE}>Thème: </span>

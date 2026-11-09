@@ -1,20 +1,66 @@
 import React from "react";
-import type { GameRecapPayload } from "../../../types/multiplayer";
+import type {
+  GameRecapPayload,
+  QuestionResponse,
+} from "../../../types/multiplayer";
 import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import { formatPlayerName } from "../../../utils/playerLabel";
+import PlayerNameLink from "../../../components/PlayerNameLink";
+import QuestionMedia from "../../../components/QuestionMedia";
+import styles from "./RecapView.module.css";
 
 interface MultiplayerRecapViewProps {
   recap: GameRecapPayload;
   currentUser: { id?: number; username?: string } | null | undefined;
   openQuestionIndex: number | null;
   onToggleQuestion: (index: number) => void;
-  onRequestRematch: () => void;
-  isRequestingRematch: boolean;
-  rematchFeedback: string | null;
+  onRequestRematch?: () => void;
+  isRequestingRematch?: boolean;
+  rematchFeedback?: string | null;
   onBackHome: () => void;
 }
 
+const cx = (...classes: (string | false | undefined)[]) =>
+  classes.filter(Boolean).join(" ");
+
+const RANK_CLASS: Record<number, string> = {
+  1: styles.rank1,
+  2: styles.rank2,
+  3: styles.rank3,
+};
+
+/** Selected answers as chips, green when correct and red otherwise. */
+const SelectedChips: React.FC<{ response: QuestionResponse }> = ({
+  response,
+}) => {
+  const selected = response.selected || [];
+  if (selected.length === 0) {
+    return <span className={styles.chipEmpty}>Aucune réponse</span>;
+  }
+  return (
+    <div className={styles.chips}>
+      {selected.map((answer) => (
+        <span
+          key={answer}
+          className={cx(
+            styles.chip,
+            (response.correct || []).includes(answer)
+              ? styles.chipOk
+              : styles.chipKo,
+          )}
+        >
+          {answer}
+        </span>
+      ))}
+    </div>
+  );
+};
+
+/**
+ * End-of-game recap (ranking + per-question details). Also used for solo
+ * games, with a recap built client-side by buildSoloRecap.
+ */
 const MultiplayerRecapView: React.FC<MultiplayerRecapViewProps> = ({
   recap,
   currentUser,
@@ -40,176 +86,236 @@ const MultiplayerRecapView: React.FC<MultiplayerRecapViewProps> = ({
     sortedPlayers.map((player) => [String(player.userId), player]),
   );
 
+  const getPlayer = (playerKey: string) =>
+    playersByUsername.get(playerKey) ?? playersByUserId.get(playerKey);
+
   const getPlayerLabel = (playerKey: string) => {
-    const byUsername = playersByUsername.get(playerKey);
-    if (byUsername) {
-      return formatPlayerName(byUsername);
-    }
-
-    const byUserId = playersByUserId.get(playerKey);
-    if (byUserId) {
-      return formatPlayerName(byUserId);
-    }
-
-    return playerKey;
+    const player = getPlayer(playerKey);
+    return player ? formatPlayerName(player) : playerKey;
   };
 
   const myPlayer = sortedPlayers.find((player) => player.isCurrentUser);
+  const isSolo = recap.session.gameMode === "SINGLEPLAYER";
+
+  // In solo the only response is the player's; in multiplayer, look up the
+  // current user's entry to flag each question as right/wrong in its header.
+  const getMyResponse = (responses: Record<string, QuestionResponse>) => {
+    const entries = Object.entries(responses || {});
+    const mine = entries.find(
+      ([playerKey]) => getPlayer(playerKey)?.isCurrentUser,
+    );
+    return (mine ?? (isSolo ? entries[0] : undefined))?.[1];
+  };
 
   return (
-    <div className="container page-xl mt-5">
+    <div className="container page-xl mt-5 mb-5">
       <Card shadow={false}>
-        <h2 className="mb-2 text-center">Recap multijoueur</h2>
-        <div className="text-center mb-4" style={{ color: "#9ca3af" }}>
-          Session {recap.session.gameSessionId} | {recap.session.questionCount}{" "}
-          questions | {recap.session.totalDuration}s
+        <h2 className={styles.title}>
+          {isSolo ? "Récapitulatif" : "Récapitulatif multijoueur"}
+        </h2>
+        <div className={styles.meta}>
+          <span className={styles.metaChip}>
+            {recap.session.questionCount} questions
+          </span>
+          <span className={styles.metaChip}>
+            {recap.session.totalDuration}s de jeu
+          </span>
+          {!isSolo && (
+            <span className={styles.metaChip}>
+              {sortedPlayers.length} joueurs
+            </span>
+          )}
         </div>
 
         {myPlayer && (
-          <div
-            className="mb-4 p-3"
-            style={{
-              border: "1px solid #374151",
-              borderRadius: 8,
-              backgroundColor: "#111827",
-            }}
-          >
-            <strong>Votre resultat:</strong> rang #{myPlayer.rank} | score{" "}
-            {myPlayer.score}/{myPlayer.totalQuestions} | {myPlayer.points}{" "}
-            points
+          <div className={styles.hero}>
+            {!isSolo && (
+              <div className={styles.heroRank}>
+                <span className={styles.heroRankLabel}>Rang</span>
+                <span className={styles.heroRankValue}>#{myPlayer.rank}</span>
+              </div>
+            )}
+            <div className={styles.stats}>
+              <div className={styles.stat}>
+                <div className={styles.statValue}>
+                  {myPlayer.correctAnswers}/{myPlayer.totalQuestions}
+                </div>
+                <div className={styles.statLabel}>Bonnes réponses</div>
+              </div>
+              <div className={styles.stat}>
+                <div className={cx(styles.statValue, styles.statValueAccent)}>
+                  {myPlayer.points}
+                </div>
+                <div className={styles.statLabel}>Points</div>
+              </div>
+              <div className={styles.stat}>
+                <div className={styles.statValue}>
+                  {myPlayer.accuracy.toFixed(0)}%
+                </div>
+                <div className={styles.statLabel}>Précision</div>
+              </div>
+              <div className={styles.stat}>
+                <div className={styles.statValue}>
+                  {myPlayer.totalTimeSeconds}s
+                </div>
+                <div className={styles.statLabel}>Temps total</div>
+              </div>
+            </div>
           </div>
         )}
 
-        <h4 className="mb-3">Classement final</h4>
-        <div className="table-responsive mb-4">
-          <table className="table table-dark table-striped align-middle">
-            <thead>
-              <tr>
-                <th>Rang</th>
-                <th>Joueur</th>
-                <th>Score</th>
-                <th>Points</th>
-                <th>Precision</th>
-                <th>Temps total</th>
-              </tr>
-            </thead>
-            <tbody>
+        {!isSolo && (
+          <>
+            <h4 className={styles.sectionTitle}>Classement final</h4>
+            <div className={styles.ranking}>
               {sortedPlayers.map((player) => (
-                <tr
+                <div
                   key={`${player.username}-${player.userId}`}
-                  style={{
-                    backgroundColor: player.isCurrentUser
-                      ? "#1f2937"
-                      : undefined,
-                  }}
+                  className={cx(
+                    styles.rankRow,
+                    player.isCurrentUser && styles.rankRowMe,
+                  )}
                 >
-                  <td>{player.rank}</td>
-                  <td>{formatPlayerName(player)}</td>
-                  <td>
-                    {player.correctAnswers}/{player.totalQuestions}
-                  </td>
-                  <td>{player.points}</td>
-                  <td>{player.accuracy.toFixed(1)}%</td>
-                  <td>{player.totalTimeSeconds}s</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <h4 className="mb-3">Details par question</h4>
-        <div className="accordion" id="recapQuestions">
-          {(recap.questions || []).map((question, idx) => (
-            <div className="accordion-item" key={question.questionId}>
-              <h2 className="accordion-header" id={`heading-${idx}`}>
-                <button
-                  className={`accordion-button${
-                    openQuestionIndex === idx ? "" : " collapsed"
-                  }`}
-                  type="button"
-                  onClick={() => onToggleQuestion(idx)}
-                  aria-expanded={openQuestionIndex === idx}
-                  aria-controls={`collapse-${idx}`}
-                >
-                  Q{idx + 1}. {question.questionText}
-                </button>
-              </h2>
-              <div
-                id={`collapse-${idx}`}
-                className={`accordion-collapse collapse${
-                  openQuestionIndex === idx ? " show" : ""
-                }`}
-                aria-labelledby={`heading-${idx}`}
-                data-bs-parent="#recapQuestions"
-                style={{
-                  display: openQuestionIndex === idx ? "block" : "none",
-                }}
-              >
-                <div className="accordion-body">
-                  <div className="table-responsive">
-                    <table className="table table-sm table-striped">
-                      <thead>
-                        <tr>
-                          <th>Joueur</th>
-                          <th>Choix</th>
-                          <th>Bonnes reponses</th>
-                          <th>Resultat</th>
-                          <th>Temps</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Object.entries(question.playerResponses || {}).map(
-                          ([playerKey, response]) => (
-                            <tr key={playerKey}>
-                              <td>{getPlayerLabel(playerKey)}</td>
-                              <td>
-                                {(response.selected || []).join(", ") || "-"}
-                              </td>
-                              <td>
-                                {(response.correct || []).join(", ") || "-"}
-                              </td>
-                              <td
-                                style={{
-                                  color: response.isCorrect
-                                    ? "#22c55e"
-                                    : "#ef4444",
-                                  fontWeight: 600,
-                                }}
-                              >
-                                {response.isCorrect ? "Correct" : "Incorrect"}
-                              </td>
-                              <td>{response.timeSeconds}s</td>
-                            </tr>
-                          ),
-                        )}
-                      </tbody>
-                    </table>
+                  <span
+                    className={cx(styles.rankBadge, RANK_CLASS[player.rank])}
+                  >
+                    {player.rank}
+                  </span>
+                  <div>
+                    <div className={styles.playerName}>
+                      <PlayerNameLink player={player} />
+                      {player.isCurrentUser && " (vous)"}
+                    </div>
+                    <div className={styles.playerSub}>
+                      {player.correctAnswers}/{player.totalQuestions} ·{" "}
+                      {player.accuracy.toFixed(0)}% · {player.totalTimeSeconds}s
+                    </div>
+                  </div>
+                  <div className={styles.playerPoints}>
+                    {player.points}
+                    <span className={styles.playerPointsUnit}>pts</span>
                   </div>
                 </div>
-              </div>
+              ))}
             </div>
-          ))}
+          </>
+        )}
+
+        <h4 className={styles.sectionTitle}>Détails par question</h4>
+        <div className={styles.questions}>
+          {(recap.questions || []).map((question, idx) => {
+            const isOpen = openQuestionIndex === idx;
+            const myResponse = getMyResponse(question.playerResponses);
+            const correctAnswers =
+              Object.values(question.playerResponses || {})[0]?.correct || [];
+            return (
+              <div
+                key={question.questionId}
+                className={cx(styles.question, isOpen && styles.questionOpen)}
+              >
+                <button
+                  type="button"
+                  className={styles.questionHeader}
+                  onClick={() => onToggleQuestion(idx)}
+                  aria-expanded={isOpen}
+                  aria-controls={`recap-question-${idx}`}
+                >
+                  <span className={styles.questionNumber}>Q{idx + 1}</span>
+                  <span className={styles.questionText}>
+                    {question.questionText}
+                  </span>
+                  {myResponse && (
+                    <span
+                      className={cx(
+                        styles.verdict,
+                        myResponse.isCorrect
+                          ? styles.verdictOk
+                          : styles.verdictKo,
+                      )}
+                      aria-label={myResponse.isCorrect ? "Correct" : "Incorrect"}
+                    >
+                      {myResponse.isCorrect ? "✓" : "✗"}
+                    </span>
+                  )}
+                  <span
+                    className={cx(styles.chevron, isOpen && styles.chevronOpen)}
+                    aria-hidden="true"
+                  >
+                    ▾
+                  </span>
+                </button>
+                {isOpen && (
+                  <div
+                    id={`recap-question-${idx}`}
+                    className={styles.questionBody}
+                  >
+                    {question.fileUrl && (
+                      <div className={styles.questionMedia}>
+                        <QuestionMedia
+                          fileUrl={question.fileUrl}
+                          type={question.questionType ?? undefined}
+                        />
+                      </div>
+                    )}
+                    <div className={styles.correctLine}>
+                      Bonne(s) réponse(s) :{" "}
+                      <strong style={{ color: "#4ade80" }}>
+                        {correctAnswers.join(", ") || "-"}
+                      </strong>
+                    </div>
+                    {Object.entries(question.playerResponses || {}).map(
+                      ([playerKey, response]) => (
+                        <div
+                          key={playerKey}
+                          className={cx(
+                            styles.response,
+                            response.isCorrect && styles.responseOk,
+                          )}
+                        >
+                          <div className={styles.responseHead}>
+                            <strong>
+                              {isSolo
+                                ? "Votre réponse"
+                                : getPlayerLabel(playerKey)}
+                            </strong>
+                            <span className={styles.responseTime}>
+                              {response.timeSeconds}s
+                            </span>
+                          </div>
+                          <SelectedChips response={response} />
+                        </div>
+                      ),
+                    )}
+                    {question.explanation && (
+                      <div className={styles.explanation}>
+                        <div className={styles.explanationTitle}>
+                          <i className="bi bi-lightbulb-fill me-2" aria-hidden="true"></i>
+                          Explication
+                        </div>
+                        <p className="mb-0">{question.explanation}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
 
-        {recap.allowRematch && (
-          <div
-            className="mt-4 p-3"
-            style={{ backgroundColor: "#1f2937", borderRadius: 8 }}
-          >
+        {recap.allowRematch && onRequestRematch && (
+          <div className={styles.rematch}>
             <div className="mb-2">
-              Rematch available ({recap.rematchExpireIn || 0}s)
+              Revanche disponible ({recap.rematchExpireIn || 0}s)
             </div>
             <Button
               variant="outline-theme"
               onClick={onRequestRematch}
               disabled={isRequestingRematch}
             >
-              {isRequestingRematch ? "Sending..." : "Request rematch"}
+              {isRequestingRematch ? "Envoi..." : "Demander une revanche"}
             </Button>
             {rematchFeedback && (
-              <div className="mt-2" style={{ color: "#d1d5db" }}>
-                {rematchFeedback}
-              </div>
+              <div className={styles.rematchFeedback}>{rematchFeedback}</div>
             )}
           </div>
         )}

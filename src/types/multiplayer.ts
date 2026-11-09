@@ -25,6 +25,8 @@ export interface PlayerResult {
   totalTimeSeconds: number;
   averageTimePerQuestion: number;
   avatar?: string | null;
+  /** Public profile of the player, null for guests. */
+  userProfileId?: number | null;
 }
 
 export interface QuestionResponse {
@@ -40,6 +42,8 @@ export interface QuestionDetail {
   playerResponses: Record<string, QuestionResponse>;
   fileUrl?: string | null;
   explanation?: string | null;
+  /** MULTIPLE / TRUE_FALSE / SOUND / IMAGE: how to display fileUrl. */
+  questionType?: string | null;
 }
 
 export interface GameRecapStatistics {
@@ -84,9 +88,37 @@ export interface AnswerProcessingResult {
   responseTimeSeconds?: number;
   [key: string]: unknown;
 }
+/** Game options chosen by the host in the lobby. */
+export interface RoomSettings {
+  numberOfQuestions: number;
+  /** Seconds allowed per question. */
+  questionDuration: number;
+  /** Absent / null = no filter. */
+  theme?: string | null;
+  civilisation?: string | null;
+  building?: string | null;
+  excludedThemes?: string[] | null;
+}
+
+export const ROOM_SETTINGS_LIMITS = {
+  minQuestions: 1,
+  maxQuestions: 50,
+  minDuration: 5,
+  maxDuration: 120,
+} as const;
+
+export const DEFAULT_ROOM_SETTINGS: RoomSettings = {
+  numberOfQuestions: 5,
+  questionDuration: 15,
+};
+
 export type LobbyPlayer = {
+  participantKey: string | null;
   userId: number;
   username: string;
   ready: boolean;
+  isHost: boolean;
   avatar?: string | null;
+  /** Public profile of the player, null for guests. */
+  userProfileId?: number | null;
 };

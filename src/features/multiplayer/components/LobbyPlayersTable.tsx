@@ -1,6 +1,6 @@
 import React from "react";
 import type { LobbyPlayer } from "../../../types/multiplayer";
-import { formatPlayerName } from "../../../utils/playerLabel";
+import PlayerNameLink from "../../../components/PlayerNameLink";
 interface LobbyPlayersTableProps {
   players: LobbyPlayer[];
 }
@@ -27,7 +27,9 @@ const LobbyPlayersTable: React.FC<LobbyPlayersTableProps> = ({ players }) => {
             ) : (
               players.map((player) => (
                 <tr key={`${player.userId}-${player.username}`}>
-                  <td>{formatPlayerName(player)}</td>
+                  <td>
+                    <PlayerNameLink player={player} />
+                  </td>
                   <td style={{ color: player.ready ? "#22c55e" : "#f59e0b" }}>
                     {player.ready ? "Ready" : "Not ready"}
                   </td>

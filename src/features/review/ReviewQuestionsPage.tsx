@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useUser } from "../../context/UserContext";
 import { useRequireRole } from "../../hooks/useRequireRole";
 import {
@@ -12,13 +12,20 @@ import QuestionFilterBar from "./components/QuestionFilterBar";
 import QuestionCard from "./components/QuestionCard";
 import ImageZoomModal from "../../components/ImageZoomModal";
 import Alert from "../../components/ui/Alert";
+import Button from "../../components/ui/Button";
 import Spinner from "../../components/ui/Spinner";
+
+/** Nombre de cartes affichées d'un coup : la liste complète dépasse 1500 questions. */
+const PAGE_SIZE = 50;
 
 /**
  * Orchestrates the review screen: auth guard, data fetching, filters/sort,
  * and the currently-expanded/edited/zoomed question. The heavier pieces of
  * UI live in features/review/components, and the edit-form state lives in
  * the useQuestionEditForm hook.
+ *
+ * La liste n'est chargée qu'une fois : après une action, la question renvoyée
+ * par le back remplace l'ancienne dans la liste locale.
  */
 const ReviewQuestionsPage: React.FC = () => {
   const { user } = useUser();
@@ -29,7 +36,11 @@ const ReviewQuestionsPage: React.FC = () => {
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [civilFilter, setCivilFilter] = useState<string>("ALL");
   const [dateSort, setDateSort] = useState<string>("DESC");
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(
+    null,
+  );
+  const [pendingQuestionId, setPendingQuestionId] = useState<number | null>(
     null,
   );
   const [zoomedImageUrl, setZoomedImageUrl] = useState<string | null>(null);
@@ -41,6 +52,7 @@ const ReviewQuestionsPage: React.FC = () => {
     startEditing,
     cancelEditing,
     setLibelle,
+    setExplication,
     setTheme,
     setCivilisation,
     setBuilding,
@@ -51,10 +63,23 @@ const ReviewQuestionsPage: React.FC = () => {
   } = useQuestionEditForm();
 
   const {
-    hasRequiredRole: hasReviewerRole,
+    hasRequiredRole: canViewQuestions,
     isAuthLoading,
     isAuthenticated,
-  } = useRequireRole(["REVIEWER", "ADMIN"]);
+  } = useRequireRole(["AUTHOR", "REVIEWER", "ADMIN"]);
+
+  const hasRole = (...names: string[]) =>
+    !!user?.roles?.some((role) => names.includes(role.name));
+  const isAdmin = hasRole("ADMIN");
+  const isAuthor = hasRole("AUTHOR");
+  // Un auteur ne modifie que ses propres questions, un admin toutes.
+  const canEditQuestion = (question: Question) =>
+    isAdmin ||
+    (isAuthor &&
+      !!user?.username &&
+      question.authorUsername === user.username);
+  // Les auteurs consultent la liste, seuls les relecteurs changent le statut.
+  const canReview = hasRole("REVIEWER", "ADMIN");
 
   useEffect(() => {
     const loadQuestions = async () => {
@@ -73,10 +98,32 @@ const ReviewQuestionsPage: React.FC = () => {
       }
     };
 
-    if (isAuthenticated && hasReviewerRole) {
+    if (isAuthenticated && canViewQuestions) {
       loadQuestions();
     }
-  }, [isAuthenticated, hasReviewerRole, user?.jwt]);
+  }, [isAuthenticated, canViewQuestions, user?.jwt]);
+
+  // Nouveau filtre ou tri : on repart des premières cartes.
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [filter, typeFilter, civilFilter, dateSort]);
+
+  const sortedQuestions = useMemo(() => {
+    const filtered = questions.filter((q) => {
+      const matchesStatus = filter === "ALL" || q.status === filter;
+      const matchesType = typeFilter === "ALL" || q.type === typeFilter;
+      const matchesCivil =
+        civilFilter === "ALL" || (q.civilisation || "NONE") === civilFilter;
+      return matchesStatus && matchesType && matchesCivil;
+    });
+    const timeOf = (q: Question) => {
+      const date = q.modifiedAt || q.createdAt;
+      return date ? new Date(date).getTime() : 0;
+    };
+    return filtered.sort((a, b) =>
+      dateSort === "DESC" ? timeOf(b) - timeOf(a) : timeOf(a) - timeOf(b),
+    );
+  }, [questions, filter, typeFilter, civilFilter, dateSort]);
 
   if (isAuthLoading || loading) {
     return (
@@ -87,22 +134,32 @@ const ReviewQuestionsPage: React.FC = () => {
     );
   }
 
-  if (!hasReviewerRole) {
+  if (!canViewQuestions) {
     return null;
   }
+
+  const replaceQuestion = (updated: Question) =>
+    setQuestions((prev) =>
+      prev.map((q) => (q.id === updated.id ? updated : q)),
+    );
 
   const handleStatusUpdate = async (questionId: number, newStatus: string) => {
     if (!user?.jwt) return;
 
     try {
-      await updateQuestionStatus(questionId, newStatus, user.jwt);
-      // Recharger les questions après la mise à jour
-      const data = await fetchQuestions(user.jwt);
-      setQuestions(data);
+      setPendingQuestionId(questionId);
+      const updated: Question = await updateQuestionStatus(
+        questionId,
+        newStatus,
+        user.jwt,
+      );
+      replaceQuestion(updated);
       setError(null);
     } catch (err) {
       setError(`Erreur lors de la mise à jour du statut`);
       console.error(err);
+    } finally {
+      setPendingQuestionId(null);
     }
   };
 
@@ -134,10 +191,12 @@ const ReviewQuestionsPage: React.FC = () => {
     try {
       setSavingEdit(true);
       setError(null);
-      await updateQuestion(
+      const updated: Question = await updateQuestion(
         {
           id: editForm.id,
           libelle: editForm.libelle.trim(),
+          // Le back remplace l'explication : on renvoie l'existante pour ne pas l'effacer.
+          explication: editForm.explication.trim() || null,
           theme: editForm.theme,
           civilisation: editForm.civilisation || "NONE",
           building: editForm.building || "NONE",
@@ -151,8 +210,7 @@ const ReviewQuestionsPage: React.FC = () => {
         },
         user.jwt,
       );
-      const data = await fetchQuestions(user.jwt);
-      setQuestions(data);
+      replaceQuestion(updated);
       cancelEditing();
     } catch (err) {
       setError("Erreur lors de la modification de la question");
@@ -162,21 +220,7 @@ const ReviewQuestionsPage: React.FC = () => {
     }
   };
 
-  const filteredQuestions = questions.filter((q) => {
-    const matchesStatus = filter === "ALL" || q.status === filter;
-    const matchesType = typeFilter === "ALL" || q.type === typeFilter;
-    const matchesCivil =
-      civilFilter === "ALL" || (q.civilisation || "NONE") === civilFilter;
-    return matchesStatus && matchesType && matchesCivil;
-  });
-
-  const sortedQuestions = [...filteredQuestions].sort((a, b) => {
-    const aDate = a.modifiedAt || a.createdAt;
-    const bDate = b.modifiedAt || b.createdAt;
-    const aTime = aDate ? new Date(aDate).getTime() : 0;
-    const bTime = bDate ? new Date(bDate).getTime() : 0;
-    return dateSort === "DESC" ? bTime - aTime : aTime - bTime;
-  });
+  const visibleQuestions = sortedQuestions.slice(0, visibleCount);
 
   return (
     <>
@@ -203,11 +247,11 @@ const ReviewQuestionsPage: React.FC = () => {
           onCivilFilterChange={setCivilFilter}
           dateSort={dateSort}
           onDateSortChange={setDateSort}
-          resultCount={filteredQuestions.length}
+          resultCount={sortedQuestions.length}
         />
 
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-          {sortedQuestions.map((question) => (
+          {visibleQuestions.map((question) => (
             <QuestionCard
               key={question.id}
               question={question}
@@ -224,9 +268,13 @@ const ReviewQuestionsPage: React.FC = () => {
                 setZoomLevel(1);
                 setZoomedImageUrl(imageUrl);
               }}
+              canEdit={canEditQuestion(question)}
+              canReview={canReview}
+              isPending={pendingQuestionId === question.id}
               editForm={editForm}
               isSavingEdit={savingEdit}
               onEditLibelleChange={setLibelle}
+              onEditExplicationChange={setExplication}
               onEditThemeChange={setTheme}
               onEditCivilisationChange={setCivilisation}
               onEditBuildingChange={setBuilding}
@@ -239,7 +287,19 @@ const ReviewQuestionsPage: React.FC = () => {
             />
           ))}
 
-          {filteredQuestions.length === 0 && (
+          {sortedQuestions.length > visibleCount && (
+            <div style={{ textAlign: "center" }}>
+              <Button
+                variant="outline-theme"
+                onClick={() => setVisibleCount((count) => count + PAGE_SIZE)}
+              >
+                Afficher plus ({sortedQuestions.length - visibleCount}{" "}
+                restantes)
+              </Button>
+            </div>
+          )}
+
+          {sortedQuestions.length === 0 && (
             <div
               style={{
                 textAlign: "center",

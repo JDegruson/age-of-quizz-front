@@ -4,14 +4,19 @@ import axios from "axios";
 import BACKEND_URL from "../../config";
 import { submitAnswers } from "../../services/quizApi";
 import { requestRematch } from "../../services/multiplayer";
+import { resolveKnownParticipantId } from "../multiplayer/utils/participant";
 import { useUser } from "../../context/UserContext";
 import {
   extractGameRecap,
+  type QuestionProgress,
   type QuizLocationState,
 } from "../multiplayer/utils/gameEvents";
 import { resolveOrGenerateParticipantId } from "../multiplayer/utils/participant";
 import { useMultiplayerQuizSocket } from "./hooks/useMultiplayerQuizSocket";
-import { useQuizTimer } from "./hooks/useQuizTimer";
+import {
+  DEFAULT_QUESTION_DURATION_SECONDS,
+  useQuizTimer,
+} from "./hooks/useQuizTimer";
 import { useQuizAudio } from "./hooks/useQuizAudio";
 import {
   normalizeQuestions,
@@ -19,12 +24,10 @@ import {
 } from "./utils/normalizeQuestions";
 import {
   buildQuizResults,
-  computeScoreAndPoints,
   type QuizResult,
 } from "./utils/scoring";
+import { buildSoloRecap } from "./utils/soloRecap";
 import MultiplayerRecapView from "./components/MultiplayerRecapView";
-import SoloRecapView from "./components/SoloRecapView";
-import SoloCorrectionView from "./components/SoloCorrectionView";
 import QuestionView from "./components/QuestionView";
 import ImageZoomModal from "../../components/ImageZoomModal";
 /**
@@ -43,11 +46,12 @@ const QuizPage: React.FC = () => {
   const [current, setCurrent] = useState(0);
   const [answers, setAnswers] = useState<number[][]>([]);
   const [answerTimers, setAnswerTimers] = useState<number[]>([]);
+  // Multiplayer only: the server sends one question at a time, so this holds
+  // its position within the whole game.
+  const [questionProgress, setQuestionProgress] =
+    useState<QuestionProgress | null>(null);
 
   const [soloQuizFinished, setSoloQuizFinished] = useState(false);
-  const [correctionIndex, setCorrectionIndex] = useState(0);
-  const [score, setScore] = useState(0);
-  const [points, setPoints] = useState(0);
   const [results, setResults] = useState<QuizResult[]>([]);
 
   const [isRequestingRematch, setIsRequestingRematch] = useState(false);
@@ -69,9 +73,13 @@ const QuizPage: React.FC = () => {
       ? initialGameRecap
       : null;
 
-  const applyNewQuestions = (rawQuestions: any[]) => {
+  const applyNewQuestions = (
+    rawQuestions: any[],
+    progress: QuestionProgress | null = null,
+  ) => {
     const normalized = normalizeQuestions(rawQuestions);
     setQuestions(normalized);
+    setQuestionProgress(progress);
     setCurrent(0);
     setAnswers(Array(normalized.length).fill([]));
     setAnswerTimers(Array(normalized.length).fill(0));
@@ -91,6 +99,11 @@ const QuizPage: React.FC = () => {
   });
 
   const isMultiplayerQuestionFlow = Boolean(roomCode) && !multiplayerRecap;
+  // Solo only: "temps illimité" chosen on the start page.
+  const isUnlimitedTime =
+    !isMultiplayerQuestionFlow && Boolean(location.state?.unlimitedTime);
+  const questionDuration =
+    questionProgress?.durationSeconds || DEFAULT_QUESTION_DURATION_SECONDS;
   const showCorrection = Boolean(multiplayerRecap) || soloQuizFinished;
 
   const audioBlobUrl = useQuizAudio(questions, current);
@@ -104,7 +117,10 @@ const QuizPage: React.FC = () => {
     }
 
     if (location.state && location.state.questions) {
-      applyNewQuestions(location.state.questions);
+      applyNewQuestions(
+        location.state.questions,
+        location.state.questionProgress ?? null,
+      );
     } else {
       // fallback: fetch from API (should not happen in normal flow)
       axios.get(`${BACKEND_URL}/questions/quizz`).then((res) => {
@@ -123,7 +139,11 @@ const QuizPage: React.FC = () => {
 
     // Save the current timer value for this question before moving
     const updatedTimers = [...answerTimers];
-    updatedTimers[current] = Math.max(1, 15 - timer); // Temps écoulé (1 à 15 secondes)
+    // Temps écoulé (en temps illimité, le timer compte déjà vers le haut)
+    updatedTimers[current] = Math.max(
+      1,
+      isUnlimitedTime ? timer : questionDuration - timer,
+    );
     setAnswerTimers(updatedTimers);
 
     if (isMultiplayerQuestionFlow) {
@@ -172,15 +192,6 @@ const QuizPage: React.FC = () => {
       }
 
       setSoloQuizFinished(true);
-
-      // Score et points - ONLY if ALL correct answers are selected
-      const { score: sc, points: pts } = computeScoreAndPoints(
-        questions,
-        answers,
-        updatedTimers,
-      );
-      setScore(sc);
-      setPoints(pts);
     }
   };
 
@@ -188,12 +199,13 @@ const QuizPage: React.FC = () => {
     resetKey: [current, questions],
     isPaused: showCorrection || isWaitingNextQuestion,
     onExpire: handleNext,
+    durationSeconds: isUnlimitedTime ? null : questionDuration,
   });
 
   const handleRequestRematch = async () => {
     if (!roomCode) {
       setRematchFeedback(
-        "Room code unavailable. Return to the multiplayer room and reconnect.",
+        "Code de la salle introuvable. Retourne dans le menu multijoueur.",
       );
       return;
     }
@@ -201,12 +213,20 @@ const QuizPage: React.FC = () => {
     setIsRequestingRematch(true);
     setRematchFeedback(null);
     try {
-      await requestRematch(roomCode, user?.jwt);
-      setRematchFeedback("Rematch request sent.");
-    } catch (error) {
+      const { code } = await requestRematch(
+        roomCode,
+        resolveKnownParticipantId(user) ?? undefined,
+        user?.jwt,
+      );
+      // Back to the lobby of the same room, already registered server-side
+      navigate("/join-room", { state: { rejoinRoomCode: code || roomCode } });
+    } catch (error: any) {
       console.error("Rematch request failed", error);
-      setRematchFeedback("Rematch request failed. Please try again.");
-    } finally {
+      setRematchFeedback(
+        error?.response?.status === 409
+          ? "Une nouvelle partie a déjà commencé dans cette salle."
+          : "Impossible de lancer la revanche. La salle n'existe peut-être plus.",
+      );
       setIsRequestingRematch(false);
     }
   };
@@ -255,29 +275,16 @@ const QuizPage: React.FC = () => {
       );
     }
 
-    // If we've gone through all questions, show final summary
-    if (correctionIndex >= results.length) {
-      return (
-        <SoloRecapView
-          results={results}
-          answerTimers={answerTimers}
-          score={score}
-          points={points}
-          onBackHome={() => navigate("/")}
-        />
-      );
-    }
-
-    // Show one question at a time during review
+    // Solo: straight to the global recap (answers + explanations per question)
     return (
-      <SoloCorrectionView
-        result={results[correctionIndex]}
-        currentQuestion={questions[correctionIndex]}
-        index={correctionIndex}
-        total={results.length}
-        savedTime={answerTimers[correctionIndex] || 0}
-        onPrev={() => setCorrectionIndex(Math.max(0, correctionIndex - 1))}
-        onNext={() => setCorrectionIndex(correctionIndex + 1)}
+      <MultiplayerRecapView
+        recap={buildSoloRecap(results, answerTimers, user, questions)}
+        currentUser={user}
+        openQuestionIndex={openRecapQuestionIndex}
+        onToggleQuestion={(idx) =>
+          setOpenRecapQuestionIndex((prev) => (prev === idx ? null : idx))
+        }
+        onBackHome={() => navigate("/")}
       />
     );
   }
@@ -291,9 +298,10 @@ const QuizPage: React.FC = () => {
     <>
       <QuestionView
         question={questions[current]}
-        index={current}
-        total={questions.length}
+        index={questionProgress?.questionIndex ?? current}
+        total={questionProgress?.totalQuestions ?? questions.length}
         timer={timer}
+        isUnlimitedTime={isUnlimitedTime}
         selectedOptionIds={answers[current] || []}
         onSelect={handleSelect}
         onNext={handleNext}

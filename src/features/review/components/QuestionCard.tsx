@@ -17,9 +17,16 @@ interface QuestionCardProps {
   onReject: () => void;
   onStartEdit: () => void;
   onZoomImage: (imageUrl: string) => void;
+  /** PUT /questions : ADMIN, ou AUTHOR sur ses propres questions. */
+  canEdit: boolean;
+  /** PUT /questions/{id}/{status} est réservé aux rôles REVIEWER / ADMIN. */
+  canReview: boolean;
+  /** Changement de statut en cours pour cette question. */
+  isPending: boolean;
   editForm: EditQuestionForm | null;
   isSavingEdit: boolean;
   onEditLibelleChange: (value: string) => void;
+  onEditExplicationChange: (value: string) => void;
   onEditThemeChange: (value: string) => void;
   onEditCivilisationChange: (value: string) => void;
   onEditBuildingChange: (value: string) => void;
@@ -39,9 +46,13 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
   onReject,
   onStartEdit,
   onZoomImage,
+  canEdit,
+  canReview,
+  isPending,
   editForm,
   isSavingEdit,
   onEditLibelleChange,
+  onEditExplicationChange,
   onEditThemeChange,
   onEditCivilisationChange,
   onEditBuildingChange,
@@ -53,6 +64,9 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
   onEditCancel,
 }) => {
   const isEditingThisQuestion = editForm?.id === question.id;
+  // Pas d'action qui ne changerait rien : approuver une question validée, rejeter une rejetée.
+  const canApprove = canReview && question.status !== "VALIDATED";
+  const canReject = canReview && question.status !== "REJECTED";
 
   return (
     <div
@@ -106,33 +120,42 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
       </div>
 
       <div style={{ marginTop: "16px", display: "flex", gap: "8px" }}>
-        <Button
-          variant="success"
-          onClick={(e) => {
-            e.stopPropagation();
-            onApprove();
-          }}
-        >
-          Approuver
-        </Button>
-        <Button
-          variant="primary"
-          onClick={(e) => {
-            e.stopPropagation();
-            onStartEdit();
-          }}
-        >
-          Modifier
-        </Button>
-        <Button
-          variant="danger"
-          onClick={(e) => {
-            e.stopPropagation();
-            onReject();
-          }}
-        >
-          Rejeter
-        </Button>
+        {canApprove && (
+          <Button
+            variant="success"
+            disabled={isPending}
+            onClick={(e) => {
+              e.stopPropagation();
+              onApprove();
+            }}
+          >
+            {question.status === "REJECTED" ? "Réapprouver" : "Approuver"}
+          </Button>
+        )}
+        {canEdit && !isEditingThisQuestion && (
+          <Button
+            variant="primary"
+            disabled={isPending}
+            onClick={(e) => {
+              e.stopPropagation();
+              onStartEdit();
+            }}
+          >
+            Modifier
+          </Button>
+        )}
+        {canReject && (
+          <Button
+            variant="danger"
+            disabled={isPending}
+            onClick={(e) => {
+              e.stopPropagation();
+              onReject();
+            }}
+          >
+            Rejeter
+          </Button>
+        )}
         <Button
           variant="secondary"
           onClick={(e) => {
@@ -160,6 +183,7 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
               form={editForm}
               saving={isSavingEdit}
               onLibelleChange={onEditLibelleChange}
+              onExplicationChange={onEditExplicationChange}
               onThemeChange={onEditThemeChange}
               onCivilisationChange={onEditCivilisationChange}
               onBuildingChange={onEditBuildingChange}

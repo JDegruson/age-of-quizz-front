@@ -1,45 +1,76 @@
 import React from "react";
 import Logo from "../components/Logo";
-import { useUser } from "../context/UserContext";
-import Card from "../components/ui/Card";
 import LinkButton from "../components/ui/LinkButton";
+import styles from "./Home.module.css";
 
 const Home: React.FC = () => {
-  const { user } = useUser();
-  const isAuthor = user?.roles?.some(
-    (role) => role.name === "AUTHOR" || role.name === "ADMIN",
-  );
   return (
-    <div className="container page-md text-center mt-5">
-      <Card padding="lg">
-        <div className="mb-4">
-          <Logo size="large" />
-          <p className="lead fs-4 mt-4" style={{ color: "#b0b0b0" }}>
-            Testez vos connaissances sur Age of Empires 2
-          </p>
-        </div>
+    <div className="container mt-4 mb-5" style={{ maxWidth: 960 }}>
+      <div className={styles.hero}>
+        <Logo size="large" />
+        <p className={styles.tagline}>
+          Testez vos connaissances sur Age of Empires 2
+        </p>
+      </div>
 
-        <div className="d-grid gap-3 col-md-8 mx-auto mt-5">
-          <LinkButton
-            to="/play"
-            variant="theme"
-            className="btn-lg py-3 rounded-pill shadow"
-          >
-            <i className="bi bi-play-circle me-2"></i>
-            Jouer
-          </LinkButton>
-          {isAuthor && (
-            <LinkButton
-              to="/create-question"
-              variant="theme"
-              className="btn-lg py-3 rounded-pill shadow"
-            >
-              <i className="bi bi-plus-circle me-2"></i>
-              Créer une question
+      <div className={styles.modes}>
+        <section className={styles.mode}>
+          <i className={`bi bi-person-fill ${styles.modeIcon}`} aria-hidden="true"></i>
+          <h2 className={styles.modeTitle}>Solo</h2>
+          <p className={styles.modeText}>
+            Choisis ton thème, ta civilisation et le nombre de questions.
+          </p>
+          <div className={styles.modeActions}>
+            <LinkButton to="/quizz/solo" className="btn-lg rounded-pill">
+              <i className="bi bi-play-fill me-2" aria-hidden="true"></i>
+              Jouer en solo
             </LinkButton>
-          )}
-        </div>
-      </Card>
+          </div>
+        </section>
+
+        <section className={styles.mode}>
+          <i className={`bi bi-people-fill ${styles.modeIcon}`} aria-hidden="true"></i>
+          <h2 className={styles.modeTitle}>Multijoueur</h2>
+          <p className={styles.modeText}>
+            Affronte tes amis en temps réel dans une salle privée.
+          </p>
+          <div className={styles.modeActions}>
+            <LinkButton to="/create-room" className="btn-lg rounded-pill">
+              <i className="bi bi-plus-lg me-2" aria-hidden="true"></i>
+              Créer une salle
+            </LinkButton>
+            <LinkButton
+              to="/join-room"
+              variant="outline-theme"
+              className="rounded-pill"
+            >
+              <i className="bi bi-box-arrow-in-right me-2" aria-hidden="true"></i>
+              Rejoindre une salle
+            </LinkButton>
+          </div>
+        </section>
+
+        <section className={styles.mode}>
+          <i className={`bi bi-question-diamond-fill ${styles.modeIcon}`} aria-hidden="true"></i>
+          <h2 className={styles.modeTitle}>Énigme du jour</h2>
+          <p className={styles.modeText}>
+            Une civilisation ou une unité à deviner chaque jour, avec des indices.
+          </p>
+          <div className={styles.modeActions}>
+            <LinkButton to="/daily-riddle" className="btn-lg rounded-pill">
+              <i className="bi bi-lightbulb-fill me-2" aria-hidden="true"></i>
+              Résoudre l'énigme
+            </LinkButton>
+          </div>
+        </section>
+      </div>
+
+      <div className={styles.secondary}>
+        <LinkButton to="/leaderboard" variant="outline-theme" className="rounded-pill">
+          <i className="bi bi-trophy-fill me-2" aria-hidden="true"></i>
+          Voir le classement
+        </LinkButton>
+      </div>
     </div>
   );
 };

@@ -12,6 +12,7 @@ interface QuestionEditFormProps {
   form: EditQuestionForm;
   saving: boolean;
   onLibelleChange: (value: string) => void;
+  onExplicationChange: (value: string) => void;
   onThemeChange: (value: string) => void;
   onCivilisationChange: (value: string) => void;
   onBuildingChange: (value: string) => void;
@@ -27,6 +28,7 @@ const QuestionEditForm: React.FC<QuestionEditFormProps> = ({
   form,
   saving,
   onLibelleChange,
+  onExplicationChange,
   onThemeChange,
   onCivilisationChange,
   onBuildingChange,
@@ -67,6 +69,17 @@ const QuestionEditForm: React.FC<QuestionEditFormProps> = ({
             value={form.libelle}
             onChange={(event) => onLibelleChange(event.target.value)}
             className="form-control"
+          />
+        </div>
+
+        <div>
+          <label className="form-label">Explication</label>
+          <textarea
+            rows={2}
+            value={form.explication}
+            onChange={(event) => onExplicationChange(event.target.value)}
+            className="form-control"
+            placeholder="Affichée au joueur après sa réponse (facultatif)"
           />
         </div>
 

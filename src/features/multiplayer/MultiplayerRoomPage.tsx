@@ -5,6 +5,7 @@ import RoomCodeField from "./components/RoomCodeField";
 import RoomStatusPanel from "./components/RoomStatusPanel";
 import LobbyPlayersTable from "./components/LobbyPlayersTable";
 import RoomActionButtons from "./components/RoomActionButtons";
+import RoomSettingsPanel from "./components/RoomSettingsPanel";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Alert from "../../components/ui/Alert";
@@ -36,9 +37,12 @@ const MultiplayerRoomPage: React.FC<MultiplayerRoomPageProps> = ({ mode }) => {
     allPlayersReady,
     canStartGame,
     currentUserLabel,
+    roomSettings,
+    isSavingSettings,
     disconnect,
     handleReady,
     handleStartGame,
+    handleUpdateSettings,
     handleConnect,
     handleCreateRoom,
     navigate,
@@ -85,6 +89,15 @@ const MultiplayerRoomPage: React.FC<MultiplayerRoomPageProps> = ({ mode }) => {
 
         <LobbyPlayersTable players={lobbyPlayers} />
 
+        {isConnected && (
+          <RoomSettingsPanel
+            settings={roomSettings}
+            editable={isHost}
+            isSaving={isSavingSettings}
+            onChange={handleUpdateSettings}
+          />
+        )}
+
         <RoomActionButtons
           onConnect={() => handleConnect()}
           onDisconnect={disconnect}
@@ -105,9 +118,9 @@ const MultiplayerRoomPage: React.FC<MultiplayerRoomPageProps> = ({ mode }) => {
           variant="link"
           className="mt-3"
           style={{ color: "#e5e7eb" }}
-          onClick={() => navigate("/play")}
+          onClick={() => navigate("/")}
         >
-          Back to game mode
+          ← Retour à l'accueil
         </Button>
       </Card>
     </div>

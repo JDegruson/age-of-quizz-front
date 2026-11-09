@@ -1,30 +1,27 @@
 import React, { useEffect, useState } from "react";
-import styles from "./UserProfile.module.css";
 import { useUser } from "../../context/UserContext";
 import { BACKEND_URL } from "../../config";
+import ProfileAvatar from "./ProfileAvatar";
+import styles from "./UserProfile.module.css";
+import { AVAILABLE_AVATARS, getAvatarUrl } from "../../utils/avatars";
+
 interface UpdateUserProfileProps {
-  idUser: number;
   onCancel: () => void;
   onUpdate: () => void;
 }
 
 const UpdateUserProfile: React.FC<UpdateUserProfileProps> = ({
-  idUser,
   onCancel,
   onUpdate,
 }) => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [pseudoDoL, setPseudoDoL] = useState("");
-  const [pseudoLoL, setPseudoLoL] = useState("");
+  const [pseudo, setPseudo] = useState("");
   const [pseudoDiscord, setPseudoDiscord] = useState("");
   const [bio, setBio] = useState("");
   const [avatar, setAvatar] = useState("");
   const [email, setEmail] = useState("");
-
-  const [showAvatarPicker, setShowAvatarPicker] = useState(false);
-  const [availableAvatars, setAvailableAvatars] = useState<string[]>([]);
 
   const { user, setUser } = useUser();
 
@@ -46,12 +43,11 @@ const UpdateUserProfile: React.FC<UpdateUserProfileProps> = ({
         }
 
         const data = await response.json();
-        setPseudoDoL(data.userProfile.pseudoDoL);
-        setPseudoLoL(data.userProfile.pseudoLoL);
-        setPseudoDiscord(data.userProfile.pseudoDiscord);
-        setBio(data.userProfile.bio);
-        setAvatar(data.userProfile.avatar);
-        setEmail(data.email);
+        setPseudo(data.userProfile.pseudo ?? "");
+        setPseudoDiscord(data.userProfile.pseudoDiscord ?? "");
+        setBio(data.userProfile.bio ?? "");
+        setAvatar(data.userProfile.avatar ?? "");
+        setEmail(data.email ?? "");
       } catch (err: any) {
         setError("Utilisateur introuvable");
       } finally {
@@ -59,31 +55,24 @@ const UpdateUserProfile: React.FC<UpdateUserProfileProps> = ({
       }
     };
     getUser();
-  }, [idUser]);
-
-  useEffect(() => {
-    // Liste manuelle, à adapter si besoin
-    setAvailableAvatars([
-      "avatar1.jpg",
-      "avatar2.jpg",
-      "avatar3.jpg",
-      "avatar4.jpg",
-      "avatar5.jpg",
-    ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSubmit = async () => {
     if (!user) return;
+    if (!pseudo.trim()) {
+      setError("Le pseudo ne peut pas être vide.");
+      return;
+    }
 
     const updatedUser = {
       ...user,
       email: email.trim(),
       userProfile: {
         ...user.userProfile,
-        pseudoDoL: pseudoDoL.trim(),
-        pseudoLoL: pseudoLoL?.trim(),
-        pseudoDiscord: pseudoDiscord?.trim(),
-        bio: bio?.trim(),
+        pseudo: pseudo.trim(),
+        pseudoDiscord: pseudoDiscord.trim(),
+        bio: bio.trim(),
         avatar,
       },
     };
@@ -107,7 +96,7 @@ const UpdateUserProfile: React.FC<UpdateUserProfileProps> = ({
     } catch (err: any) {
       const message = err.message || err.toString();
       if (message.includes("UserWithSamePseudoExistException")) {
-        setError("Ce pseudo DoL est déjà utilisé.");
+        setError("Ce pseudo est déjà utilisé.");
       } else if (message.includes("email")) {
         setError("Cette adresse mail est déjà utilisée.");
       } else {
@@ -130,47 +119,42 @@ const UpdateUserProfile: React.FC<UpdateUserProfileProps> = ({
       <h1 className="text-center">Modifier mon profil</h1>
       <div className="row">
         <div className="col-12 col-md-6 col-lg-4 m-auto p-3">
-          <form className="mt-3">
+          <form className="mt-3" onSubmit={(e) => e.preventDefault()}>
             {error && <div className="alert alert-danger mt-3">{error}</div>}
-            <div className="text-center">
-              <div
-                className={`mb-4 ${styles.avatarContainer}`}
-                onClick={() => setShowAvatarPicker(true)}
-              >
-                <img
-                  src={`/Avatar/${avatar}`}
-                  alt={`Avatar de ${pseudoDoL}`}
-                  className={`img-fluid rounded-circle ${styles.avatar}`}
-                  style={{ cursor: "pointer" }}
-                />
-                <div className={`p-1 w-75 rounded small ${styles.overlayText}`}>
-                  Changer mon avatar
+            <div className="d-flex justify-content-center mb-3">
+              <ProfileAvatar avatar={avatar} pseudo={pseudo} />
+            </div>
+            {AVAILABLE_AVATARS.length > 0 && (
+              <fieldset className="mb-4">
+                <legend className="form-label fs-6">Avatar</legend>
+                <div className="d-flex flex-wrap gap-2 justify-content-center">
+                  {AVAILABLE_AVATARS.map((file) => (
+                    <button
+                      key={file}
+                      type="button"
+                      className={`${styles.avatarOption} ${
+                        file === avatar ? styles.avatarOptionSelected : ""
+                      }`}
+                      aria-pressed={file === avatar}
+                      title={file}
+                      onClick={() => setAvatar(file)}
+                    >
+                      <img src={getAvatarUrl(file) ?? undefined} alt="" />
+                    </button>
+                  ))}
                 </div>
-              </div>
-            </div>
+              </fieldset>
+            )}
             <div className="mb-3">
-              <label htmlFor="pseudoDoL" className="form-label">
-                Pseudo DoL
+              <label htmlFor="pseudo" className="form-label">
+                Pseudo
               </label>
               <input
-                id="pseudoDoL"
+                id="pseudo"
                 type="text"
                 className="form-control"
-                value={pseudoDoL}
-                onChange={(e) => setPseudoDoL(e.target.value)}
-              />
-            </div>
-
-            <div className="mb-3">
-              <label htmlFor="pseudoLoL" className="form-label">
-                Pseudo LoL
-              </label>
-              <input
-                id="pseudoLoL"
-                type="text"
-                className="form-control"
-                value={pseudoLoL}
-                onChange={(e) => setPseudoLoL(e.target.value)}
+                value={pseudo}
+                onChange={(e) => setPseudo(e.target.value)}
               />
             </div>
 
@@ -232,35 +216,6 @@ const UpdateUserProfile: React.FC<UpdateUserProfileProps> = ({
           </form>
         </div>
       </div>
-
-      {showAvatarPicker && (
-        <div
-          className={styles.modalBackdrop}
-          onClick={() => setShowAvatarPicker(false)}
-        >
-          <div
-            className={styles.modalContent}
-            onClick={(e) => e.stopPropagation()} // éviter la fermeture au clic interne
-          >
-            <h5 className="text-center mb-4">Choisir un avatar</h5>
-            <div className="d-flex flex-wrap gap-2 justify-content-center">
-              {availableAvatars.map((img) => (
-                <img
-                  key={img}
-                  src={`/Avatar/${img}`}
-                  alt={img}
-                  className={`${styles.avatarOption}`}
-                  style={{ width: "80px", height: "80px", cursor: "pointer" }}
-                  onClick={() => {
-                    setAvatar(img);
-                    setShowAvatarPicker(false);
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

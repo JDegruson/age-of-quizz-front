@@ -20,6 +20,10 @@ export function useQuestionEditForm() {
     setEditForm((prev) => (prev ? { ...prev, libelle } : prev));
   };
 
+  const setExplication = (explication: string) => {
+    setEditForm((prev) => (prev ? { ...prev, explication } : prev));
+  };
+
   const setTheme = (theme: string) => {
     setEditForm((prev) => (prev ? { ...prev, theme } : prev));
   };
@@ -82,6 +86,7 @@ export function useQuestionEditForm() {
     startEditing,
     cancelEditing,
     setLibelle,
+    setExplication,
     setTheme,
     setCivilisation,
     setBuilding,

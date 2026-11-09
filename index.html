@@ -1,15 +1,54 @@
 <!doctype html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Age of Quizz</title>
+    <title>Age of Quizz – Le quiz Age of Empires 2</title>
+    <meta
+      name="description"
+      content="Testez vos connaissances sur Age of Empires 2 : civilisations, unités, arbre des technologies, sons et histoire. Quiz solo, parties multijoueur entre amis et énigme du jour."
+    />
+    <link rel="canonical" href="https://ageofquizz.fr/" />
+    <meta name="theme-color" content="#161616" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+
+    <!-- Aperçu des liens partagés (Discord, réseaux sociaux...) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Age of Quizz" />
+    <meta property="og:locale" content="fr_FR" />
+    <meta property="og:url" content="https://ageofquizz.fr/" />
+    <meta property="og:title" content="Age of Quizz – Le quiz Age of Empires 2" />
+    <meta
+      property="og:description"
+      content="Quiz solo, multijoueur entre amis et énigme du jour sur Age of Empires 2."
+    />
+    <meta property="og:image" content="https://ageofquizz.fr/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "Age of Quizz",
+        "url": "https://ageofquizz.fr/",
+        "inLanguage": "fr",
+        "description": "Quiz en ligne sur Age of Empires 2 : solo, multijoueur et énigme du jour."
+      }
+    </script>
+
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" />
     <link rel="stylesheet" href="/src/styles/index.css" />
   </head>
   <body>
     <div id="root"></div>
+    <noscript>
+      Age of Quizz est un quiz sur Age of Empires 2 : questions sur les
+      civilisations, les unités, l'arbre des technologies et l'histoire, en solo
+      ou en multijoueur. Activez JavaScript pour jouer.
+    </noscript>
     <script type="module" src="/src/index.tsx"></script>
   </body>
 </html>

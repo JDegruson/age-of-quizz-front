@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../../../context/UserContext";
 import {
   GameRoomSocket,
@@ -8,28 +8,67 @@ import {
 import type { GameEvent } from "../../../types/multiplayer";
 import {
   createMultiplayerRoom,
+  getMultiplayerRoomState,
   joinMultiplayerRoom,
   setMultiplayerPlayerReady,
   startMultiplayerRoom,
+  updateMultiplayerRoomSettings,
 } from "../../../services/multiplayer";
-import { extractQuestionsFromEvent } from "../utils/gameEvents";
+import {
+  extractQuestionProgress,
+  extractQuestionsFromEvent,
+} from "../utils/gameEvents";
 import {
   resolveKnownParticipantId,
   setStoredParticipantId,
 } from "../utils/participant";
-import type { LobbyPlayer } from "../../../types/multiplayer";
+import {
+  DEFAULT_ROOM_SETTINGS,
+  type LobbyPlayer,
+  type RoomSettings,
+} from "../../../types/multiplayer";
 
 const normalizeRoomCode = (value: string) => value.trim().toUpperCase();
 
 const PSEUDO_STORAGE_KEY = "multiplayer_pseudo";
 
 const normalizeLobbyPlayers = (rawPlayers: any[]): LobbyPlayer[] => {
-  return (rawPlayers || []).map((player: any) => ({
-    userId: Number(player.userId ?? -1),
-    username: String(player.username || `anon_${player.userId ?? -1}`),
-    ready: Boolean(player.ready),
-    avatar: player.avatar || null,
-  }));
+  return (rawPlayers || []).map((player: any) =>
+    // Older payloads only carried usernames
+    typeof player === "string"
+      ? {
+          participantKey: null,
+          userId: -1,
+          username: player,
+          ready: false,
+          isHost: false,
+        }
+      : {
+          participantKey: player.participantKey ?? null,
+          userId: Number(player.userId ?? -1),
+          username: String(player.username || `anon_${player.userId ?? -1}`),
+          ready: Boolean(player.ready),
+          isHost: Boolean(player.host),
+          avatar: player.avatar || null,
+          userProfileId:
+            typeof player.userProfileId === "number"
+              ? player.userProfileId
+              : null,
+        },
+  );
+};
+
+/**
+ * Key identifying the current client in the room, in the backend format:
+ * "user:<id>" for logged-in users, the stored participantId for guests.
+ */
+const resolveSelfParticipantKey = (
+  user: { id?: number | string | null } | null,
+): string | null => {
+  if (user?.id !== undefined && user?.id !== null) {
+    return `user:${user.id}`;
+  }
+  return resolveKnownParticipantId(user);
 };
 
 /**
@@ -40,6 +79,7 @@ const normalizeLobbyPlayers = (rawPlayers: any[]): LobbyPlayer[] => {
  */
 export function useMultiplayerRoom(mode: "create" | "join") {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useUser();
 
   const socketRef = useRef<GameRoomSocket | null>(null);
@@ -62,9 +102,16 @@ export function useMultiplayerRoom(mode: "create" | "join") {
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isReady, setIsReady] = useState(false);
   const [hostUserId, setHostUserId] = useState<number | null>(null);
+  const [hostParticipantKey, setHostParticipantKey] = useState<string | null>(
+    null,
+  );
   const [isStartingGame, setIsStartingGame] = useState(false);
   const [lastEventType, setLastEventType] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [roomSettings, setRoomSettings] = useState<RoomSettings>(
+    DEFAULT_ROOM_SETTINGS,
+  );
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   const disconnect = () => {
     cleanupFnsRef.current.forEach((cleanup) => cleanup());
@@ -78,7 +125,9 @@ export function useMultiplayerRoom(mode: "create" | "join") {
     setCountdown(null);
     setIsReady(false);
     setHostUserId(null);
+    setHostParticipantKey(null);
     setIsStartingGame(false);
+    setRoomSettings(DEFAULT_ROOM_SETTINGS);
     setStatus("Déconnecté");
   };
 
@@ -91,7 +140,7 @@ export function useMultiplayerRoom(mode: "create" | "join") {
 
   const requireDisplayName = (): string | null => {
     if (user?.username) {
-      return user.username;
+      return user.userProfile?.pseudo || user.username;
     }
     if (!trimmedPseudo) {
       setError("Merci de choisir un pseudo avant de rejoindre une salle.");
@@ -150,6 +199,15 @@ export function useMultiplayerRoom(mode: "create" | "join") {
     if (nextHostUserId !== null) {
       setHostUserId(nextHostUserId);
     }
+
+    const nextHostKey = (payload?.room?.host ?? payload?.host)?.participantKey;
+    if (typeof nextHostKey === "string") {
+      setHostParticipantKey(nextHostKey);
+    }
+
+    if (payload.settings && typeof payload.settings === "object") {
+      setRoomSettings(payload.settings as RoomSettings);
+    }
   };
 
   const handleRoomEvent = (event: GameEvent<unknown>) => {
@@ -170,6 +228,7 @@ export function useMultiplayerRoom(mode: "create" | "join") {
           state: {
             questions: rawQuestions,
             roomCode: connectedRoomCodeRef.current,
+            questionProgress: extractQuestionProgress(event.data),
           },
         });
       }
@@ -185,7 +244,8 @@ export function useMultiplayerRoom(mode: "create" | "join") {
       event.type === "PLAYER_JOINED" ||
       event.type === "PLAYER_LEFT" ||
       event.type === "PLAYER_READY" ||
-      event.type === "COUNTDOWN_STARTED"
+      event.type === "COUNTDOWN_STARTED" ||
+      event.type === "ROOM_SETTINGS_UPDATED"
     ) {
       setStatus(`Événement reçu : ${event.type}`);
     }
@@ -218,17 +278,29 @@ export function useMultiplayerRoom(mode: "create" | "join") {
   };
 
   const currentUserId = toUserIdOrNull(user?.id);
+  const selfParticipantKey = resolveSelfParticipantKey(user);
+  // Guests all share userId -1 on the backend, so the participant key is the
+  // only reliable way to recognise the host
   const isHost =
-    currentUserId !== null &&
-    hostUserId !== null &&
-    currentUserId === hostUserId;
-  const canAssumeHostWhenUnknown = isConnected && hostUserId === null;
+    hostParticipantKey !== null
+      ? selfParticipantKey === hostParticipantKey
+      : currentUserId !== null &&
+        hostUserId !== null &&
+        currentUserId === hostUserId;
+  const canAssumeHostWhenUnknown =
+    isConnected && hostUserId === null && hostParticipantKey === null;
   const canStartAsHost = isHost || canAssumeHostWhenUnknown;
   const hasPlayersInLobby = lobbyPlayers.length > 0;
   const selfLobbyPlayer =
-    currentUserId === null
+    lobbyPlayers.find(
+      (player) =>
+        player.participantKey !== null &&
+        player.participantKey === selfParticipantKey,
+    ) ||
+    (currentUserId === null
       ? null
-      : lobbyPlayers.find((player) => player.userId === currentUserId) || null;
+      : lobbyPlayers.find((player) => player.userId === currentUserId) ||
+        null);
   const allPlayersReady = hasPlayersInLobby
     ? lobbyPlayers.every((player) => player.ready)
     : isReady || Boolean(selfLobbyPlayer?.ready);
@@ -257,6 +329,35 @@ export function useMultiplayerRoom(mode: "create" | "join") {
       setStatus("Erreur au lancement de la partie");
     } finally {
       setIsStartingGame(false);
+    }
+  };
+
+  // Host only: the server broadcasts ROOM_SETTINGS_UPDATED to every client,
+  // the local state is applied right away so the form stays responsive.
+  const handleUpdateSettings = async (nextSettings: RoomSettings) => {
+    const activeRoomCode = connectedRoomCodeRef.current;
+    if (!activeRoomCode || !isHost) {
+      return;
+    }
+
+    const previousSettings = roomSettings;
+    setRoomSettings(nextSettings);
+    try {
+      setIsSavingSettings(true);
+      setError(null);
+      const saved = await updateMultiplayerRoomSettings(
+        activeRoomCode,
+        nextSettings,
+        resolveKnownParticipantId(user) ?? undefined,
+        user?.jwt,
+      );
+      setRoomSettings(saved);
+    } catch (settingsError) {
+      console.error("Failed to update room settings", settingsError);
+      setRoomSettings(previousSettings);
+      setError("Impossible de modifier les options de la partie.");
+    } finally {
+      setIsSavingSettings(false);
     }
   };
 
@@ -331,6 +432,18 @@ export function useMultiplayerRoom(mode: "create" | "join") {
       setConnectedRoomCode(cleanedRoomCode);
       setStatus(`Connecté à la salle ${cleanedRoomCode}`);
       setRoomCode(cleanedRoomCode);
+
+      // Our own PLAYER_JOINED was broadcast before we subscribed: fetch the
+      // current lobby so we see players (and their ready state) already there
+      try {
+        const roomState = await getMultiplayerRoomState(
+          cleanedRoomCode,
+          user?.jwt,
+        );
+        updateLobbyState(roomState);
+      } catch (stateError) {
+        console.error("Failed to fetch room state", stateError);
+      }
     } catch (connectionError) {
       console.error("Failed to connect to room socket", connectionError);
       setError(
@@ -385,11 +498,23 @@ export function useMultiplayerRoom(mode: "create" | "join") {
   useEffect(() => {
     if (mode === "create") {
       handleCreateRoom();
+      return;
+    }
+    // Coming back from a rematch: the server already put us back in the room
+    const rejoinRoomCode = (location.state as { rejoinRoomCode?: string })
+      ?.rejoinRoomCode;
+    if (rejoinRoomCode) {
+      setRoomCode(rejoinRoomCode);
+      handleConnect(rejoinRoomCode, { alreadyJoined: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const currentUserLabel = user?.username || trimmedPseudo || "anonymous";
+  const currentUserLabel =
+    user?.userProfile?.pseudo ||
+    user?.username ||
+    trimmedPseudo ||
+    "Utilisateur non connecté";
 
   return {
     roomCode,
@@ -413,9 +538,12 @@ export function useMultiplayerRoom(mode: "create" | "join") {
     allPlayersReady,
     canStartGame,
     currentUserLabel,
+    roomSettings,
+    isSavingSettings,
     disconnect,
     handleReady,
     handleStartGame,
+    handleUpdateSettings,
     handleConnect,
     handleCreateRoom,
     navigate,

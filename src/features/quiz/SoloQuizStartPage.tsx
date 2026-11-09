@@ -3,8 +3,12 @@ import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import BACKEND_URL from "../../config";
 
-import { BUILDING_OPTIONS } from "../../data/buildings";
-import { CIVILIZATIONS, CIVILIZATIONS_MAP } from "../../data/civilizations";
+import { BUILDING_LABELS, BUILDING_OPTIONS } from "../../data/buildings";
+import {
+  CIVILIZATIONS,
+  CIVILIZATIONS_MAP,
+  getCivilisationLabel,
+} from "../../data/civilizations";
 import {
   QUESTION_THEME_OPTIONS,
   getThemeLabel,
@@ -12,209 +16,405 @@ import {
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Alert from "../../components/ui/Alert";
+import styles from "./SoloQuizStartPage.module.css";
 
-type FilterQuestionDTO = {
-  building?: string;
-  civilisation?: string;
-  theme?: string;
+const TECH_TREE_THEME = "TECH_TREE";
+const QUESTION_COUNTS = [10, 20, 40, 60];
+const MIN_QUESTIONS = 1;
+const MAX_QUESTIONS = 100;
+const QUICK_GAME_QUESTIONS = 20;
+const STORAGE_KEY = "solo_quiz_settings";
+
+const THEME_ICONS: Record<string, string> = {
+  TECH_TREE: "bi-diagram-3",
+  IMAGE: "bi-image",
+  UNIT_STATS: "bi-bar-chart",
+  SOUND: "bi-volume-up",
+  CULTURE: "bi-book",
+};
+
+interface SoloSettings {
   numberOfQuestions: number;
+  unlimitedTime: boolean;
+  /** null = tous les thèmes / toutes les civs / tous les bâtiments. */
+  theme: string | null;
+  civilisation: string | null;
+  building: string | null;
+  excludeTechTree: boolean;
+}
+
+const DEFAULT_SETTINGS: SoloSettings = {
+  numberOfQuestions: QUICK_GAME_QUESTIONS,
+  unlimitedTime: false,
+  theme: null,
+  civilisation: null,
+  building: null,
+  excludeTechTree: false,
+};
+
+const clampCount = (value: number) =>
+  Math.max(MIN_QUESTIONS, Math.min(MAX_QUESTIONS, Math.round(value)));
+
+/** Last settings used, so a player doesn't redo their choices every time. */
+const loadSettings = (): SoloSettings => {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return raw ? { ...DEFAULT_SETTINGS, ...JSON.parse(raw) } : DEFAULT_SETTINGS;
+  } catch {
+    return DEFAULT_SETTINGS;
+  }
+};
+
+const saveSettings = (settings: SoloSettings) => {
+  try {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  } catch {
+    // Storage unavailable (private mode...): settings just won't be remembered
+  }
+};
+
+const Chip: React.FC<{
+  selected: boolean;
+  onClick: () => void;
+  icon?: string;
+  children: React.ReactNode;
+}> = ({ selected, onClick, icon, children }) => (
+  <button
+    type="button"
+    className={`${styles.chip} ${selected ? styles.chipSelected : ""}`}
+    aria-pressed={selected}
+    onClick={onClick}
+  >
+    {icon && !selected && <i className={`bi ${icon}`} aria-hidden="true"></i>}
+    {children}
+  </button>
+);
+
+const describe = (s: SoloSettings) => {
+  const parts = [
+    `${s.numberOfQuestions} question${s.numberOfQuestions > 1 ? "s" : ""}`,
+    s.unlimitedTime ? "temps illimité" : "15 s par question",
+    s.theme ? getThemeLabel(s.theme) : "tous les thèmes",
+  ];
+  if (s.civilisation) parts.push(getCivilisationLabel(s.civilisation));
+  if (s.building) parts.push(BUILDING_LABELS[s.building] || s.building);
+  if (s.excludeTechTree) parts.push("sans arbre des technologies");
+  return parts.join(" · ");
 };
 
 const SoloQuizStartPage: React.FC = () => {
-  const [filter, setFilter] = useState<FilterQuestionDTO>({
-    numberOfQuestions: 20,
-  });
-  const [questions, setQuestions] = useState<any[]>([]);
+  const navigate = useNavigate();
+  const [settings, setSettings] = useState<SoloSettings>(loadSettings);
+  const [countDraft, setCountDraft] = useState(
+    String(settings.numberOfQuestions),
+  );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [customNumber, setCustomNumber] = useState<number | null>(null);
-  const [numberMode, setNumberMode] = useState<
-    "short" | "medium" | "long" | "custom"
-  >("short");
-  const navigate = useNavigate();
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
-    setFilter({ ...filter, [e.target.name]: e.target.value });
+  const update = (patch: Partial<SoloSettings>) =>
+    setSettings((s) => ({ ...s, ...patch }));
+
+  const setCount = (value: number) => {
+    const next = clampCount(value);
+    update({ numberOfQuestions: next });
+    setCountDraft(String(next));
   };
 
-  const handleNumberMode = (mode: "short" | "medium" | "long" | "custom") => {
-    setNumberMode(mode);
-    let numberOfQuestions = 20;
-    if (mode === "short") numberOfQuestions = 20;
-    if (mode === "medium") numberOfQuestions = 40;
-    if (mode === "long") numberOfQuestions = 60;
-    if (mode === "custom" && customNumber) numberOfQuestions = customNumber;
-    setFilter((f) => ({ ...f, numberOfQuestions }));
+  const commitCountDraft = () => {
+    const parsed = Number(countDraft);
+    if (countDraft.trim() === "" || !Number.isFinite(parsed)) {
+      setCountDraft(String(settings.numberOfQuestions));
+      return;
+    }
+    setCount(parsed);
   };
 
-  const handleCustomNumber = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = Math.max(1, Math.min(100, Number(e.target.value)));
-    setCustomNumber(value);
-    setFilter((f) => ({ ...f, numberOfQuestions: value }));
-  };
+  const toggleExcludeTechTree = (checked: boolean) =>
+    update({
+      excludeTechTree: checked,
+      // Thème choisi et thème exclu ne peuvent pas être le même.
+      theme: checked && settings.theme === TECH_TREE_THEME ? null : settings.theme,
+    });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const start = async (chosen: SoloSettings) => {
     setLoading(true);
     setError("");
-    setQuestions([]);
     try {
-      const res = await axios.post(`${BACKEND_URL}/questions/quizz`, filter);
-      // Navigate to /quiz with questions in state
-      navigate("/quiz", { state: { questions: res.data } });
+      // Pas de filtre = champ absent : le back filtre sinon sur la valeur
+      // exacte (ex. civilisation "NONE" = questions sans civilisation).
+      const res = await axios.post(`${BACKEND_URL}/questions/quizz`, {
+        numberOfQuestions: chosen.numberOfQuestions,
+        theme: chosen.theme ?? undefined,
+        civilisation: chosen.civilisation ?? undefined,
+        building: chosen.building ?? undefined,
+        excludedThemes: chosen.excludeTechTree ? [TECH_TREE_THEME] : undefined,
+      });
+      navigate("/quiz", {
+        state: { questions: res.data, unlimitedTime: chosen.unlimitedTime },
+      });
     } catch (err) {
-      setError("Erreur lors de la récupération des questions.");
-    } finally {
+      setError("Impossible de récupérer les questions. Réessaie dans un instant.");
       setLoading(false);
     }
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    saveSettings(settings);
+    start(settings);
+  };
+
+  const hasFilters =
+    settings.theme !== null ||
+    settings.civilisation !== null ||
+    settings.building !== null ||
+    settings.excludeTechTree;
+
   return (
-    <div
-      className="container d-flex justify-content-center align-items-center"
-      style={{ minHeight: "80vh" }}
-    >
-      <Card shadow={false} style={{ maxWidth: 540, width: "100%" }}>
-        <h2 className="mb-4 text-center">Lancer un quizz solo</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label className="form-label">Bâtiment :</label>
-            <select
-              name="building"
-              value={filter.building || "NONE"}
-              onChange={handleChange}
-              className="form-select"
-            >
-              {BUILDING_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="mb-3">
-            <label className="form-label">Civilisation :</label>
-            <select
-              name="civilisation"
-              value={filter.civilisation || "NONE"}
-              onChange={handleChange}
-              className="form-select"
-            >
-              <option value="NONE">Aucune civilisation</option>
-              {CIVILIZATIONS.map((label) => (
-                <option key={label} value={CIVILIZATIONS_MAP[label]}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="mb-3">
-            <label className="form-label">Thème :</label>
-            <select
-              name="theme"
-              value={filter.theme || "TECH_TREE"}
-              onChange={handleChange}
-              className="form-select"
-            >
-              {QUESTION_THEME_OPTIONS.map((value) => (
-                <option key={value} value={value}>
-                  {getThemeLabel(value)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="mb-3">
-            <label className="form-label">Nombre de questions :</label>
-            <div className="d-flex gap-2 flex-wrap">
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  flexWrap: "wrap",
-                }}
-              >
-                <Button
-                  type="button"
-                  onClick={() => handleNumberMode("short")}
-                  variant={numberMode === "short" ? "theme" : "outline-theme"}
-                  style={{
-                    minWidth: 130,
-                    height: 44,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  Courte (20)
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => handleNumberMode("medium")}
-                  variant={numberMode === "medium" ? "theme" : "outline-theme"}
-                  style={{
-                    minWidth: 130,
-                    height: 44,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  Moyenne (40)
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => handleNumberMode("long")}
-                  variant={numberMode === "long" ? "theme" : "outline-theme"}
-                  style={{
-                    minWidth: 130,
-                    height: 44,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  Longue (60)
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => handleNumberMode("custom")}
-                  variant={numberMode === "custom" ? "theme" : "outline-theme"}
-                  style={{
-                    minWidth: 130,
-                    height: 44,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                  }}
-                >
-                  Personnalisé
-                </Button>
-                {numberMode === "custom" && (
-                  <input
-                    type="number"
-                    min={1}
-                    max={100}
-                    value={customNumber ?? filter.numberOfQuestions}
-                    onChange={handleCustomNumber}
-                    className="form-control ms-2"
-                    style={{ width: 80, height: 44 }}
-                  />
-                )}
-              </div>
+    <div className="container mt-4 mb-5">
+      <Card className={styles.page}>
+        <h1 className={styles.title}>Quizz solo</h1>
+        <p className={styles.subtitle}>
+          Lance une partie rapide ou compose ton quizz sur mesure.
+        </p>
+
+        <div className={styles.quick}>
+          <div>
+            <div className={styles.quickTitle}>
+              <i className="bi bi-lightning-charge-fill me-2" aria-hidden="true"></i>
+              Partie rapide
+            </div>
+            <div className={styles.quickText}>
+              {QUICK_GAME_QUESTIONS} questions au hasard, 15 secondes chacune
             </div>
           </div>
           <Button
-            type="submit"
+            type="button"
             disabled={loading}
-            className="w-100 mt-2"
-            style={{ fontSize: 18 }}
+            className="rounded-pill px-4"
+            onClick={() => start(DEFAULT_SETTINGS)}
           >
-            {loading ? "Chargement..." : "Lancer le quizz"}
+            <i className="bi bi-play-fill me-1" aria-hidden="true"></i>
+            Jouer
           </Button>
+        </div>
+
+        <div className={styles.divider}>ou personnalise ta partie</div>
+
+        <form onSubmit={handleSubmit}>
+          <fieldset className={styles.group}>
+            <legend className={styles.legend}>
+              <i className="bi bi-list-ol" aria-hidden="true"></i>
+              Nombre de questions
+            </legend>
+            <div className={styles.chips}>
+              {QUESTION_COUNTS.map((count) => (
+                <Chip
+                  key={count}
+                  selected={settings.numberOfQuestions === count}
+                  onClick={() => setCount(count)}
+                >
+                  {count}
+                </Chip>
+              ))}
+              <div className={styles.stepper}>
+                <button
+                  type="button"
+                  aria-label="Une question de moins"
+                  disabled={settings.numberOfQuestions <= MIN_QUESTIONS}
+                  onClick={() => setCount(settings.numberOfQuestions - 1)}
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={MIN_QUESTIONS}
+                  max={MAX_QUESTIONS}
+                  aria-label="Nombre de questions"
+                  value={countDraft}
+                  onChange={(e) => setCountDraft(e.target.value)}
+                  onBlur={commitCountDraft}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      commitCountDraft();
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  aria-label="Une question de plus"
+                  disabled={settings.numberOfQuestions >= MAX_QUESTIONS}
+                  onClick={() => setCount(settings.numberOfQuestions + 1)}
+                >
+                  +
+                </button>
+              </div>
+            </div>
+          </fieldset>
+
+          <fieldset className={styles.group}>
+            <legend className={styles.legend}>
+              <i className="bi bi-stopwatch" aria-hidden="true"></i>
+              Temps par question
+            </legend>
+            <div className={styles.chips}>
+              <Chip
+                selected={!settings.unlimitedTime}
+                onClick={() => update({ unlimitedTime: false })}
+                icon="bi-hourglass-split"
+              >
+                15 secondes
+              </Chip>
+              <Chip
+                selected={settings.unlimitedTime}
+                onClick={() => update({ unlimitedTime: true })}
+                icon="bi-infinity"
+              >
+                Illimité
+              </Chip>
+            </div>
+            {settings.unlimitedTime && (
+              <p className={styles.hint}>
+                Prends ton temps : plus tu réponds vite, plus tu marques de
+                points.
+              </p>
+            )}
+          </fieldset>
+
+          <fieldset className={styles.group}>
+            <legend className={styles.legend}>
+              <i className="bi bi-tags" aria-hidden="true"></i>
+              Thème
+            </legend>
+            <div className={styles.chips}>
+              <Chip
+                selected={settings.theme === null}
+                onClick={() => update({ theme: null })}
+                icon="bi-shuffle"
+              >
+                Tous
+              </Chip>
+              {QUESTION_THEME_OPTIONS.filter(
+                (value) =>
+                  !(settings.excludeTechTree && value === TECH_TREE_THEME),
+              ).map((value) => (
+                <Chip
+                  key={value}
+                  selected={settings.theme === value}
+                  onClick={() => update({ theme: value })}
+                  icon={THEME_ICONS[value]}
+                >
+                  {getThemeLabel(value)}
+                </Chip>
+              ))}
+            </div>
+            <label className={styles.switch}>
+              <input
+                type="checkbox"
+                role="switch"
+                className="form-check-input m-0"
+                checked={settings.excludeTechTree}
+                onChange={(e) => toggleExcludeTechTree(e.target.checked)}
+              />
+              Exclure les questions sur l'arbre des technologies
+            </label>
+          </fieldset>
+
+          <fieldset className={styles.group}>
+            <legend className={styles.legend}>
+              <i className="bi bi-funnel" aria-hidden="true"></i>
+              Filtres
+              <span className={styles.chipSmall}>(facultatifs)</span>
+            </legend>
+            <div className={styles.filters}>
+              <div>
+                <label htmlFor="solo-civilisation" className="form-label">
+                  Civilisation
+                </label>
+                <select
+                  id="solo-civilisation"
+                  className="form-select"
+                  value={settings.civilisation ?? ""}
+                  onChange={(e) =>
+                    update({ civilisation: e.target.value || null })
+                  }
+                >
+                  <option value="">Toutes les civilisations</option>
+                  {CIVILIZATIONS.map((label) => (
+                    <option key={label} value={CIVILIZATIONS_MAP[label]}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="solo-building" className="form-label">
+                  Bâtiment
+                </label>
+                <select
+                  id="solo-building"
+                  className="form-select"
+                  value={settings.building ?? ""}
+                  onChange={(e) => update({ building: e.target.value || null })}
+                >
+                  <option value="">Tous les bâtiments</option>
+                  {BUILDING_OPTIONS.filter((o) => o.value !== "NONE").map(
+                    (option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </div>
+            </div>
+            {hasFilters && (
+              <p className={styles.hint}>
+                S'il n'y a pas assez de questions correspondantes, la partie est
+                complétée avec des questions au hasard.
+              </p>
+            )}
+          </fieldset>
+
+          <div className={styles.summary}>
+            <p className={styles.summaryText} aria-live="polite">
+              {describe(settings)}
+            </p>
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-100 btn-lg rounded-pill"
+            >
+              {loading ? (
+                "Chargement..."
+              ) : (
+                <>
+                  <i className="bi bi-play-fill me-1" aria-hidden="true"></i>
+                  Lancer le quizz
+                </>
+              )}
+            </Button>
+            {hasFilters && (
+              <button
+                type="button"
+                className={styles.reset}
+                onClick={() =>
+                  update({
+                    theme: null,
+                    civilisation: null,
+                    building: null,
+                    excludeTechTree: false,
+                  })
+                }
+              >
+                Réinitialiser les filtres
+              </button>
+            )}
+          </div>
         </form>
+
         {error && <Alert className="mt-3 text-center">{error}</Alert>}
       </Card>
     </div>

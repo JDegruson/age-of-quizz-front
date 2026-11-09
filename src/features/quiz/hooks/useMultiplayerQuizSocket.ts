@@ -7,8 +7,10 @@ import type { GameRecapPayload } from "../../../types/multiplayer";
 import {
   extractGameRecapFromUnknown,
   extractLivePlayerResults,
+  extractQuestionProgress,
   extractQuestionsFromEvent,
   extractQuestionsFromUnknown,
+  type QuestionProgress,
 } from "../../multiplayer/utils/gameEvents";
 
 export interface LivePlayerScore {
@@ -28,7 +30,8 @@ export interface LivePlayerScore {
  * `onNewQuestions` is called whenever a fresh question (or batch of
  * questions) arrives from the server — the caller is responsible for
  * normalizing the raw payload and updating the quiz state (current index,
- * answers, timers...).
+ * answers, timers...). `progress` is the question's position within the
+ * game, when the server provides it.
  */
 export function useMultiplayerQuizSocket({
   roomCode,
@@ -39,7 +42,10 @@ export function useMultiplayerQuizSocket({
   roomCode?: string;
   jwt?: string;
   initialRecap: GameRecapPayload | null;
-  onNewQuestions: (rawQuestions: any[]) => void;
+  onNewQuestions: (
+    rawQuestions: any[],
+    progress: QuestionProgress | null,
+  ) => void;
 }) {
   const [multiplayerRecap, setMultiplayerRecap] =
     useState<GameRecapPayload | null>(initialRecap);
@@ -56,12 +62,15 @@ export function useMultiplayerQuizSocket({
     isWaitingNextQuestionRef.current = isWaitingNextQuestion;
   }, [isWaitingNextQuestion]);
 
-  const applyIncomingQuestion = (rawQuestions: any[]) => {
+  const applyIncomingQuestion = (
+    rawQuestions: any[],
+    progress: QuestionProgress | null,
+  ) => {
     if (!rawQuestions || rawQuestions.length === 0) {
       return;
     }
 
-    onNewQuestions(rawQuestions);
+    onNewQuestions(rawQuestions, progress);
     setIsWaitingNextQuestion(false);
     waitingSinceRef.current = null;
     setWaitingElapsedSeconds(0);
@@ -96,7 +105,10 @@ export function useMultiplayerQuizSocket({
               (event.type === "NEW_QUESTION" ||
                 isWaitingNextQuestionRef.current)
             ) {
-              applyIncomingQuestion(rawQuestions);
+              applyIncomingQuestion(
+                rawQuestions,
+                extractQuestionProgress(event.data),
+              );
               return;
             }
 
@@ -159,7 +171,10 @@ export function useMultiplayerQuizSocket({
             maybeQuestions.length > 0 &&
             isWaitingNextQuestionRef.current
           ) {
-            applyIncomingQuestion(maybeQuestions);
+            applyIncomingQuestion(
+              maybeQuestions,
+              extractQuestionProgress(payload),
+            );
           }
         };
 

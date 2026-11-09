@@ -34,6 +34,7 @@ export const QUESTION_THEME_LABELS: { [key: string]: string } = {
   IMAGE: "Image",
   UNIT_STATS: "Statistiques des unités",
   SOUND: "Son",
+  CULTURE: "Culture et histoire",
 };
 
 export const getThemeLabel = (theme?: string): string =>

@@ -1,5 +1,6 @@
 import axios from "axios";
 import BACKEND_URL from "../config";
+import type { RoomSettings } from "../types/multiplayer";
 
 const API_URL = BACKEND_URL;
 
@@ -122,7 +123,50 @@ export const setMultiplayerPlayerReady = async (
   return response.data;
 };
 
-export const requestRematch = async (roomCode: string, jwt?: string) => {
+export const updateMultiplayerRoomSettings = async (
+  roomCode: string,
+  settings: RoomSettings,
+  participantId?: string,
+  jwt?: string,
+): Promise<RoomSettings> => {
+  const headers = jwt
+    ? {
+        Authorization: `Bearer ${jwt}`,
+        "Content-Type": "application/json",
+      }
+    : {
+        "Content-Type": "application/json",
+      };
+
+  const response = await axios.put(
+    `${API_URL}/multiplayer/rooms/${encodeURIComponent(roomCode)}/settings`,
+    { ...settings, participantId },
+    { headers },
+  );
+  return response.data;
+};
+
+export const getMultiplayerRoomState = async (
+  roomCode: string,
+  jwt?: string,
+) => {
+  const headers = jwt ? { Authorization: `Bearer ${jwt}` } : {};
+  const response = await axios.get(
+    `${API_URL}/multiplayer/rooms/${encodeURIComponent(roomCode)}/state`,
+    { headers },
+  );
+  return response.data;
+};
+
+/**
+ * Brings the player back to the lobby of the same room after a finished
+ * game. The first player to come back resets the room (and becomes host).
+ */
+export const requestRematch = async (
+  roomCode: string,
+  participantId?: string,
+  jwt?: string,
+): Promise<{ code: string }> => {
   try {
     const headers = jwt
       ? {
@@ -134,8 +178,8 @@ export const requestRematch = async (roomCode: string, jwt?: string) => {
         };
 
     const response = await axios.post(
-      `${API_URL}/room/${encodeURIComponent(roomCode)}/rematch`,
-      null,
+      `${API_URL}/multiplayer/rooms/${encodeURIComponent(roomCode)}/rematch`,
+      { participantId },
       { headers },
     );
     return response.data;

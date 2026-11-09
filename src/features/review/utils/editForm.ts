@@ -14,6 +14,7 @@ export type EditQuestionForm = {
   building: string;
   type: string;
   fileUrl?: string;
+  explication: string;
   answers: EditAnswer[];
 };
 
@@ -62,6 +63,7 @@ export function buildEditForm(question: Question): EditQuestionForm {
     building: question.building || "NONE",
     type: question.type || "MULTIPLE",
     fileUrl: question.fileUrl || undefined,
+    explication: question.explication || "",
     answers: normalizedAnswers,
   };
 }

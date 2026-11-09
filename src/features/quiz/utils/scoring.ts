@@ -52,7 +52,7 @@ export function computeScoreAndPoints(
 /**
  * True when the selected set is exactly the correct set (same size, same
  * members). Shared by the ID-based scoring below and the text-based
- * QuizResult comparisons used in SoloCorrectionView/SoloRecapView.
+ * QuizResult comparisons used in buildSoloRecap.
  */
 export function isExactMatch<T>(selected: T[], correct: T[]): boolean {
   return (

@@ -1,27 +1,26 @@
-import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
+import { useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import UserProfile from "./UserProfileComponent";
 import UpdateUserProfile from "./UpdateUserProfile";
 import EditPasswordForm from "./EditPasswordForm";
 
 import { useUser } from "../../context/UserContext";
 
+/**
+ * /profile/:id shows any player's public profile; /profile shows the
+ * logged-in user's own profile (with the edit buttons).
+ */
 const ProfilePage = () => {
   const { id } = useParams<{ id: string }>();
-  const [isConnectedUser, setIsConnectedUser] = useState<boolean>(false);
+  const { user } = useUser();
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [isEditingPassword, setIsEditingPassword] = useState<boolean>(false);
-  const { user } = useUser();
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    setIsConnectedUser(false);
-    if (user !== null) {
-      if (user.userProfile.id === Number(id)) {
-        setIsConnectedUser(true);
-      }
-    }
-  }, [user, id]);
+  const ownProfileId = user?.userProfile?.id ?? null;
+  const userProfileId = id ? Number(id) : ownProfileId;
+  const isConnectedUser =
+    ownProfileId !== null && userProfileId === ownProfileId;
 
   const handleEditClick = () => {
     setSuccessMessage("");
@@ -33,7 +32,6 @@ const ProfilePage = () => {
     setIsEditing(false);
   };
   const handleUpdateProfile = () => {
-    setSuccessMessage("");
     setIsEditing(false);
     setSuccessMessage("Profil mis à jour avec succès !");
   };
@@ -51,50 +49,58 @@ const ProfilePage = () => {
     setSuccessMessage("Mot de passe mis à jour avec succès !");
   };
 
+  if (userProfileId === null || Number.isNaN(userProfileId)) {
+    return (
+      <div className="container page-md mt-5">
+        <p className="text-center bg-theme p-3 rounded">
+          <Link to="/login">Connecte-toi</Link> pour voir ton profil.
+        </p>
+      </div>
+    );
+  }
+
   return (
-    <div className="container">
+    <div className="container mt-4">
       {successMessage && (
         <div className="alert alert-success text-center">{successMessage}</div>
       )}
-      <div className="row">
-        <div className="col-12 mb-4">
-          {id &&
-            (isEditing ? (
-              <UpdateUserProfile
-                idUser={Number(id)}
-                onCancel={handleCancelEdit}
-                onUpdate={handleUpdateProfile}
-              />
-            ) : isEditingPassword ? (
-              <EditPasswordForm
-                onCancel={handleCancelEditPassword}
-                onUpdate={handleUpdatePassword}
-              />
-            ) : (
-              <UserProfile
-                idUser={Number(id)}
-                isConnectedUser={isConnectedUser}
-              />
-            ))}
 
-          {isConnectedUser && !isEditing && !isEditingPassword && (
-            <>
-              <div
-                className="btn btn-bg-theme mt-3 me-3"
-                onClick={handleEditClick}
-              >
-                Modifier mon profil
-              </div>
-              <div
-                className="btn btn-bg-theme mt-3"
-                onClick={handleEditPasswordClick}
-              >
-                Modifier mon mot de passe
-              </div>
-            </>
-          )}
+      {isConnectedUser && !isEditing && !isEditingPassword && (
+        <div className="d-flex flex-wrap gap-2 justify-content-end mb-3">
+          <button
+            type="button"
+            className="btn btn-bg-theme"
+            onClick={handleEditClick}
+          >
+            Modifier mon profil
+          </button>
+          <button
+            type="button"
+            className="btn btn-bg-theme"
+            onClick={handleEditPasswordClick}
+          >
+            Modifier mon mot de passe
+          </button>
         </div>
-      </div>
+      )}
+
+      {isEditing ? (
+        <UpdateUserProfile
+          onCancel={handleCancelEdit}
+          onUpdate={handleUpdateProfile}
+        />
+      ) : isEditingPassword ? (
+        <EditPasswordForm
+          onCancel={handleCancelEditPassword}
+          onUpdate={handleUpdatePassword}
+        />
+      ) : (
+        <UserProfile
+          // Remount after an edit so the header reloads the saved values
+          key={`${userProfileId}-${successMessage ?? ""}`}
+          userProfileId={userProfileId}
+        />
+      )}
     </div>
   );
 };

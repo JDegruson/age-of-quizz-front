@@ -15,6 +15,7 @@ export interface Question {
   fileUrl?: string | null;
   authorUsername?: string;
   answers?: Answer[];
+  explication?: string | null;
   createdAt?: string;
   modifiedAt?: string;
 }
