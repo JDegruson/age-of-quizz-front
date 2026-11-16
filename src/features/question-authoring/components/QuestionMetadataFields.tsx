@@ -1,5 +1,7 @@
 import React from "react";
-import CIVILIZATIONS from "../../../data/civilizations";
+import CivilisationSelect from "../../../components/CivilisationSelect";
+
+const NO_CIVILISATION = [{ value: "NONE", label: "Aucune civilisation" }];
 import { BUILDING_OPTIONS } from "../../../data/buildings";
 import { getThemeLabel } from "../../../utils/questionLabels";
 
@@ -44,19 +46,16 @@ const QuestionMetadataFields: React.FC<QuestionMetadataFieldsProps> = ({
       )}
 
       <div className="mb-3">
-        <label className="form-label">Civilisation</label>
-        <select
+        <label htmlFor="question-civilisation" className="form-label">
+          Civilisation
+        </label>
+        <CivilisationSelect
+          id="question-civilisation"
           value={civilization}
-          onChange={(e) => onCivilizationChange(e.target.value)}
-          className="form-select"
-        >
-          <option value="NONE">Aucune civilisation</option>
-          {CIVILIZATIONS.map((civ) => (
-            <option key={civ} value={civ}>
-              {civ}
-            </option>
-          ))}
-        </select>
+          onChange={onCivilizationChange}
+          extraOptions={NO_CIVILISATION}
+          valueKind="label"
+        />
       </div>
 
       <div className="mb-3">

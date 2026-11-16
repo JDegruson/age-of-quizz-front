@@ -148,7 +148,7 @@ const ExportCivDataPage: React.FC = () => {
   }
 
   return (
-    <div className="container page-xl mt-5">
+    <div className="container page-fit page-xl mt-5">
       <div className="card bg-dark text-light border-secondary">
         <div className="card-body">
           <h2 className="card-title mb-3">Export JSON vers Excel (CSV)</h2>

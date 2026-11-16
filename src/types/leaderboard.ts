@@ -4,6 +4,8 @@ export interface Leaderboard {
   questionsAnswered: LeaderboardEntry[];
   multiplayerWins: LeaderboardEntry[];
   dailyRiddleStreak: LeaderboardEntry[];
+  /** value = questions created, sampleSize = questions validated. */
+  questionsCreated: LeaderboardEntry[];
   /** Minimum questions answered to appear in the accuracy ranking. */
   minQuestionsForAccuracy: number;
   computedAt: string;

@@ -98,6 +98,24 @@ export const joinMultiplayerRoom = async (
   return response.data;
 };
 
+/** Leave the lobby; the server passes the host role on if needed. */
+export const leaveMultiplayerRoom = async (
+  roomCode: string,
+  participantId?: string,
+  jwt?: string,
+) => {
+  const headers = jwt
+    ? { Authorization: `Bearer ${jwt}`, "Content-Type": "application/json" }
+    : { "Content-Type": "application/json" };
+
+  const response = await axios.post(
+    `${API_URL}/multiplayer/rooms/${encodeURIComponent(roomCode)}/leave`,
+    { participantId },
+    { headers },
+  );
+  return response.data;
+};
+
 export const setMultiplayerPlayerReady = async (
   roomCode: string,
   request: ReadyRequest = { ready: true },

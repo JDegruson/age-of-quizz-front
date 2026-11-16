@@ -1,5 +1,10 @@
 import React from "react";
-import { CIVILIZATIONS_MAP } from "../../../data/civilizations";
+import CivilisationSelect from "../../../components/CivilisationSelect";
+
+const CIVILISATION_FILTER_EXTRAS = [
+  { value: "ALL", label: "Toutes les civilisations" },
+  { value: "NONE", label: "Aucune" },
+];
 
 const LABEL_STYLE: React.CSSProperties = {
   marginRight: "10px",
@@ -14,6 +19,9 @@ interface QuestionFilterBarProps {
   onTypeFilterChange: (value: string) => void;
   civilFilter: string;
   onCivilFilterChange: (value: string) => void;
+  authorFilter: string;
+  onAuthorFilterChange: (value: string) => void;
+  authors: string[];
   dateSort: string;
   onDateSortChange: (value: string) => void;
   resultCount: number;
@@ -26,6 +34,9 @@ const QuestionFilterBar: React.FC<QuestionFilterBarProps> = ({
   onTypeFilterChange,
   civilFilter,
   onCivilFilterChange,
+  authorFilter,
+  onAuthorFilterChange,
+  authors,
   dateSort,
   onDateSortChange,
   resultCount,
@@ -70,17 +81,28 @@ const QuestionFilterBar: React.FC<QuestionFilterBarProps> = ({
           </select>
         </div>
         <div>
-          <label style={LABEL_STYLE}>Filtrer par civilisation:</label>
-          <select
+          <label htmlFor="filter-civilisation" style={LABEL_STYLE}>
+            Filtrer par civilisation:
+          </label>
+          <CivilisationSelect
+            id="filter-civilisation"
             value={civilFilter}
-            onChange={(e) => onCivilFilterChange(e.target.value)}
+            onChange={onCivilFilterChange}
+            extraOptions={CIVILISATION_FILTER_EXTRAS}
+          />
+        </div>
+        <div>
+          <label style={LABEL_STYLE}>Filtrer par auteur:</label>
+          <select
+            value={authorFilter}
+            onChange={(e) => onAuthorFilterChange(e.target.value)}
             className="form-select"
           >
-            <option value="ALL">Toutes les civilisations</option>
-            <option value="NONE">Aucune</option>
-            {Object.entries(CIVILIZATIONS_MAP).map(([label, value]) => (
-              <option key={value} value={value}>
-                {label}
+            <option value="ALL">Tous les auteurs</option>
+            <option value="NONE">Inconnu</option>
+            {authors.map((author) => (
+              <option key={author} value={author}>
+                {author}
               </option>
             ))}
           </select>

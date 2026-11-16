@@ -31,6 +31,13 @@ export interface UserStats {
     validated: number;
     inReview: number;
     rejected: number;
+    /** Distinct themes / civilisations covered by validated questions. */
+    validatedThemes: number;
+    validatedCivilisations: number;
+    /** Validated image or sound questions. */
+    validatedMedia: number;
+    /** Answers given by other players to this author's questions. */
+    timesAnswered: number;
   } | null;
 }
 

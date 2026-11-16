@@ -9,7 +9,12 @@ import { useUser } from "../../context/UserContext";
 import { fetchLeaderboard } from "../../services/userProfileApi";
 import type { Leaderboard, LeaderboardEntry } from "../../types/leaderboard";
 
-type Category = "accuracy" | "questionsAnswered" | "multiplayerWins" | "dailyRiddleStreak";
+type Category =
+  | "accuracy"
+  | "questionsAnswered"
+  | "multiplayerWins"
+  | "dailyRiddleStreak"
+  | "questionsCreated";
 
 const plural = (n: number, word: string) => `${n} ${word}${n > 1 ? "s" : ""}`;
 
@@ -50,6 +55,14 @@ const CATEGORIES: {
     formatValue: (e) => plural(e.value, "jour"),
     formatSample: (e) => `${plural(e.sampleSize, "énigme")} jouée${e.sampleSize > 1 ? "s" : ""}`,
   },
+  {
+    id: "questionsCreated",
+    label: "Auteurs",
+    description: () =>
+      "Nombre de questions créées, quel que soit leur statut. À égalité, le plus de questions validées passe devant.",
+    formatValue: (e) => `${plural(e.value, "question")} créée${e.value > 1 ? "s" : ""}`,
+    formatSample: (e) => `${e.sampleSize} validée${e.sampleSize > 1 ? "s" : ""}`,
+  },
 ];
 
 const RANK_CLASS: Record<number, string> = {
@@ -74,11 +87,12 @@ const LeaderboardPage: React.FC = () => {
   }, []);
 
   const current = CATEGORIES.find((c) => c.id === category)!;
-  const entries = board ? board[category] : [];
+  // "?? []" : un back pas encore à jour ne renvoie pas le classement auteurs.
+  const entries = board ? (board[category] ?? []) : [];
   const ownProfileId = user?.userProfile?.id;
 
   return (
-    <div className="container page-md mt-5">
+    <div className="container page-fit page-md mt-5">
       <Card>
         <h1 className={styles.title}>Classement</h1>
 

@@ -1,6 +1,7 @@
 import { useRef, useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../../../context/UserContext";
+import BACKEND_URL from "../../../config";
 import {
   GameRoomSocket,
   isGameRecapEvent,
@@ -10,6 +11,7 @@ import {
   createMultiplayerRoom,
   getMultiplayerRoomState,
   joinMultiplayerRoom,
+  leaveMultiplayerRoom,
   setMultiplayerPlayerReady,
   startMultiplayerRoom,
   updateMultiplayerRoomSettings,
@@ -80,19 +82,22 @@ const resolveSelfParticipantKey = (
 export function useMultiplayerRoom(mode: "create" | "join") {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
 
   const socketRef = useRef<GameRoomSocket | null>(null);
   const cleanupFnsRef = useRef<Array<() => void>>([]);
   const connectedRoomCodeRef = useRef<string>("");
 
-  const [roomCode, setRoomCode] = useState("");
+  // Lien d'invitation : /join-room?code=XXXX pré-remplit le code
+  const [roomCode, setRoomCode] = useState(() =>
+    normalizeRoomCode(new URLSearchParams(location.search).get("code") || ""),
+  );
   const [pseudo, setPseudo] = useState(
     () => window.localStorage.getItem(PSEUDO_STORAGE_KEY) || "",
   );
   const isAnonymous = !user?.username;
   const trimmedPseudo = pseudo.trim();
-  const [status, setStatus] = useState("Disconnected");
+  const [status, setStatus] = useState("Déconnecté");
   const [isConnecting, setIsConnecting] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [connectedRoomCode, setConnectedRoomCode] = useState<string | null>(
@@ -143,7 +148,7 @@ export function useMultiplayerRoom(mode: "create" | "join") {
       return user.userProfile?.pseudo || user.username;
     }
     if (!trimmedPseudo) {
-      setError("Merci de choisir un pseudo avant de rejoindre une salle.");
+      setError("Choisis un pseudo pour jouer.");
       return null;
     }
     window.localStorage.setItem(PSEUDO_STORAGE_KEY, trimmedPseudo);
@@ -251,30 +256,57 @@ export function useMultiplayerRoom(mode: "create" | "join") {
     }
   };
 
-  const handleReady = async () => {
+  const [isSendingReady, setIsSendingReady] = useState(false);
+  const handleReady = async (ready: boolean = true) => {
     const activeRoomCode = connectedRoomCodeRef.current;
     if (!activeRoomCode) {
       return;
     }
 
     try {
+      setIsSendingReady(true);
       setError(null);
-      setStatus("Envoi du statut prêt...");
+      setStatus(ready ? "Envoi du statut prêt..." : "Annulation du statut prêt...");
       await setMultiplayerPlayerReady(
         activeRoomCode,
         {
-          ready: true,
+          ready,
           participantId: resolveKnownParticipantId(user) ?? undefined,
         },
         user?.jwt,
       );
-      setIsReady(true);
-      setStatus("Prêt envoyé");
+      setIsReady(ready);
+      setStatus(ready ? "Prêt envoyé" : "Statut prêt annulé");
     } catch (readyError) {
       console.error("Failed to set player ready", readyError);
-      setError("Impossible d'envoyer le statut prêt.");
-      setStatus("Erreur lors de l'envoi du ready");
+      setError(
+        ready
+          ? "Impossible d'envoyer le statut prêt."
+          : "Impossible d'annuler le statut prêt.",
+      );
+      setStatus("Erreur lors de l'envoi du statut prêt");
+    } finally {
+      setIsSendingReady(false);
     }
+  };
+
+  // Prévient le serveur (qui retire le joueur et passe le rôle d'hôte si
+  // besoin) avant de couper la connexion. Un échec réseau ne doit pas
+  // empêcher de partir.
+  const handleLeave = async () => {
+    const activeRoomCode = connectedRoomCodeRef.current;
+    if (activeRoomCode) {
+      try {
+        await leaveMultiplayerRoom(
+          activeRoomCode,
+          resolveKnownParticipantId(user) ?? undefined,
+          user?.jwt,
+        );
+      } catch (leaveError) {
+        console.error("Failed to leave room", leaveError);
+      }
+    }
+    disconnect();
   };
 
   const currentUserId = toUserIdOrNull(user?.id);
@@ -301,9 +333,11 @@ export function useMultiplayerRoom(mode: "create" | "join") {
       ? null
       : lobbyPlayers.find((player) => player.userId === currentUserId) ||
         null);
+  // L'état serveur (liste des joueurs) prime sur l'état local
+  const selfReady = selfLobbyPlayer ? selfLobbyPlayer.ready : isReady;
   const allPlayersReady = hasPlayersInLobby
     ? lobbyPlayers.every((player) => player.ready)
-    : isReady || Boolean(selfLobbyPlayer?.ready);
+    : selfReady;
   const canStartGame =
     isConnected && canStartAsHost && allPlayersReady && !isStartingGame;
 
@@ -367,7 +401,7 @@ export function useMultiplayerRoom(mode: "create" | "join") {
   ) => {
     const cleanedRoomCode = normalizeRoomCode(codeOverride ?? roomCode);
     if (!cleanedRoomCode) {
-      setError("Please provide a room code.");
+      setError("Saisis le code de la salle.");
       return;
     }
 
@@ -412,7 +446,7 @@ export function useMultiplayerRoom(mode: "create" | "join") {
         (result) => {
           const currentUserId = user?.id ?? -1;
           if (result.userId === currentUserId || currentUserId < 0) {
-            setStatus("Answer feedback received");
+            setStatus("Résultat de la réponse reçu");
           }
         },
       );
@@ -422,7 +456,7 @@ export function useMultiplayerRoom(mode: "create" | "join") {
         const privateAnswerCleanup = socket.subscribeAnswerResultPrivate(
           cleanedRoomCode,
           () => {
-            setStatus("Private answer feedback received");
+            setStatus("Résultat privé de la réponse reçu");
           },
         );
         cleanupFnsRef.current.push(privateAnswerCleanup);
@@ -447,9 +481,9 @@ export function useMultiplayerRoom(mode: "create" | "join") {
     } catch (connectionError) {
       console.error("Failed to connect to room socket", connectionError);
       setError(
-        "Échec de la connexion. Vérifiez le code de la salle et réessayez.",
+        "Impossible de rejoindre la salle. Vérifie le code et réessaie.",
       );
-      setStatus("Connection failed");
+      setStatus("Échec de la connexion");
       disconnect();
     } finally {
       setIsConnecting(false);
@@ -460,7 +494,6 @@ export function useMultiplayerRoom(mode: "create" | "join") {
   const createRoomCalledRef = useRef(false);
   const handleCreateRoom = async () => {
     if (createRoomCalledRef.current) {
-      console.log("handleCreateRoom: déjà appelé, on ignore");
       return;
     }
 
@@ -470,7 +503,6 @@ export function useMultiplayerRoom(mode: "create" | "join") {
     }
 
     createRoomCalledRef.current = true;
-    console.log("handleCreateRoom called", Date.now());
     setIsConnecting(true);
     setStatus("Création de la salle...");
     setError(null);
@@ -484,20 +516,71 @@ export function useMultiplayerRoom(mode: "create" | "join") {
         setRoomCode(code);
         await handleConnect(code, { alreadyJoined: true });
       } else {
-        setError("Erreur lors de la création de la salle.");
+        createRoomCalledRef.current = false;
+        setError("Impossible de créer la salle. Réessaie dans un instant.");
         setStatus("Erreur création salle");
       }
     } catch (e) {
-      setError("Erreur lors de la création de la salle.");
+      createRoomCalledRef.current = false;
+      setError("Impossible de créer la salle. Réessaie dans un instant.");
       setStatus("Erreur création salle");
     } finally {
       setIsConnecting(false);
     }
   };
 
+  // Onglet fermé ou rechargé dans le salon : on prévient le serveur pour ne
+  // pas laisser un joueur fantôme. "pagehide" ne se déclenche pas lors d'une
+  // navigation interne (ex. vers /quiz au lancement de la partie), et
+  // keepalive laisse la requête aboutir pendant le déchargement de la page.
   useEffect(() => {
+    if (!isConnected) {
+      return;
+    }
+    const onPageHide = () => {
+      const activeRoomCode = connectedRoomCodeRef.current;
+      if (!activeRoomCode) {
+        return;
+      }
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (user?.jwt) {
+        headers.Authorization = `Bearer ${user.jwt}`;
+      }
+      try {
+        fetch(
+          `${BACKEND_URL}/multiplayer/rooms/${encodeURIComponent(activeRoomCode)}/leave`,
+          {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+              participantId: resolveKnownParticipantId(user) ?? undefined,
+            }),
+            keepalive: true,
+          },
+        );
+      } catch {
+        // Page en cours de fermeture : rien d'autre à faire
+      }
+    };
+    window.addEventListener("pagehide", onPageHide);
+    return () => window.removeEventListener("pagehide", onPageHide);
+  }, [isConnected, user]);
+
+  // Attend que l'utilisateur soit chargé (sinon un joueur connecté serait pris
+  // pour un invité), puis ne s'exécute qu'une fois.
+  const initDoneRef = useRef(false);
+  useEffect(() => {
+    if (isUserLoading || initDoneRef.current) {
+      return;
+    }
+    initDoneRef.current = true;
     if (mode === "create") {
-      handleCreateRoom();
+      // Invité sans pseudo mémorisé : on attend qu'il en choisisse un
+      if (!isAnonymous || trimmedPseudo) {
+        handleCreateRoom();
+      }
       return;
     }
     // Coming back from a rematch: the server already put us back in the room
@@ -508,7 +591,7 @@ export function useMultiplayerRoom(mode: "create" | "join") {
       handleConnect(rejoinRoomCode, { alreadyJoined: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isUserLoading]);
 
   const currentUserLabel =
     user?.userProfile?.pseudo ||
@@ -524,6 +607,7 @@ export function useMultiplayerRoom(mode: "create" | "join") {
     isAnonymous,
     trimmedPseudo,
     status,
+    isUserLoading,
     isConnecting,
     isConnected,
     connectedRoomCode,
@@ -537,11 +621,15 @@ export function useMultiplayerRoom(mode: "create" | "join") {
     canStartAsHost,
     allPlayersReady,
     canStartGame,
+    selfLobbyPlayer,
+    selfReady,
+    isSendingReady,
     currentUserLabel,
     roomSettings,
     isSavingSettings,
     disconnect,
     handleReady,
+    handleLeave,
     handleStartGame,
     handleUpdateSettings,
     handleConnect,

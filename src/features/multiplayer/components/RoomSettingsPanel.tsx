@@ -1,15 +1,13 @@
 import React, { useEffect, useState } from "react";
 import { VARIANT_CLASS } from "../../../components/ui/Button";
 import { BUILDING_OPTIONS, BUILDING_LABELS } from "../../../data/buildings";
-import {
-  CIVILIZATIONS,
-  CIVILIZATIONS_MAP,
-  getCivilisationLabel,
-} from "../../../data/civilizations";
+import { getCivilisationLabel } from "../../../data/civilizations";
+import CivilisationSelect from "../../../components/CivilisationSelect";
 import {
   QUESTION_THEME_OPTIONS,
   getThemeLabel,
 } from "../../../utils/questionLabels";
+import { useQuestionAuthors } from "../../../hooks/useQuestionAuthors";
 import {
   ROOM_SETTINGS_LIMITS,
   type RoomSettings,
@@ -18,6 +16,7 @@ import {
 const TECH_TREE_THEME = "TECH_TREE";
 // Valeur des <select> pour "pas de filtre" (le back attend null).
 const ANY = "";
+const ANY_CIVILISATION = [{ value: ANY, label: "Toutes les civilisations" }];
 
 const QUESTION_COUNT_PRESETS = [5, 10, 20, 30];
 const DURATION_PRESETS = [10, 15, 20, 30];
@@ -116,6 +115,7 @@ const RoomSettingsPanel: React.FC<RoomSettingsPanelProps> = ({
   isSaving,
   onChange,
 }) => {
+  const authors = useQuestionAuthors();
   const excludeTechTree = !!settings.excludedThemes?.includes(TECH_TREE_THEME);
   const update = (patch: Partial<RoomSettings>) =>
     onChange({ ...settings, ...patch });
@@ -127,6 +127,7 @@ const RoomSettingsPanel: React.FC<RoomSettingsPanelProps> = ({
         `Civilisation : ${getCivilisationLabel(settings.civilisation)}`,
       settings.building &&
         `Bâtiment : ${BUILDING_LABELS[settings.building] || settings.building}`,
+      settings.authorUsername && `Auteur : ${settings.authorUsername}`,
       excludeTechTree && "Sans arbre des technologies",
     ].filter(Boolean);
 
@@ -234,23 +235,16 @@ const RoomSettingsPanel: React.FC<RoomSettingsPanelProps> = ({
         <label htmlFor="room-civilisation" className="form-label">
           Civilisation
         </label>
-        <select
+        <CivilisationSelect
           id="room-civilisation"
-          className="form-select"
           value={settings.civilisation ?? ANY}
           disabled={disabled}
-          onChange={(e) => update({ civilisation: e.target.value || null })}
-        >
-          <option value={ANY}>Toutes les civilisations</option>
-          {CIVILIZATIONS.map((label) => (
-            <option key={label} value={CIVILIZATIONS_MAP[label]}>
-              {label}
-            </option>
-          ))}
-        </select>
+          onChange={(value) => update({ civilisation: value || null })}
+          extraOptions={ANY_CIVILISATION}
+        />
       </div>
 
-      <div className="mb-2">
+      <div className="mb-3">
         <label htmlFor="room-building" className="form-label">
           Bâtiment
         </label>
@@ -269,6 +263,32 @@ const RoomSettingsPanel: React.FC<RoomSettingsPanelProps> = ({
               </option>
             ),
           )}
+        </select>
+      </div>
+
+      <div className="mb-2">
+        <label htmlFor="room-author" className="form-label">
+          Auteur
+        </label>
+        <select
+          id="room-author"
+          className="form-select"
+          value={settings.authorUsername ?? ANY}
+          disabled={disabled}
+          onChange={(e) => update({ authorUsername: e.target.value || null })}
+        >
+          <option value={ANY}>Tous les auteurs</option>
+          {settings.authorUsername &&
+            !authors.includes(settings.authorUsername) && (
+              <option value={settings.authorUsername}>
+                {settings.authorUsername}
+              </option>
+            )}
+          {authors.map((author) => (
+            <option key={author} value={author}>
+              {author}
+            </option>
+          ))}
         </select>
       </div>
 

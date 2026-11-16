@@ -4,21 +4,20 @@ import { useNavigate } from "react-router-dom";
 import BACKEND_URL from "../../config";
 
 import { BUILDING_LABELS, BUILDING_OPTIONS } from "../../data/buildings";
-import {
-  CIVILIZATIONS,
-  CIVILIZATIONS_MAP,
-  getCivilisationLabel,
-} from "../../data/civilizations";
+import { getCivilisationLabel } from "../../data/civilizations";
+import CivilisationSelect from "../../components/CivilisationSelect";
 import {
   QUESTION_THEME_OPTIONS,
   getThemeLabel,
 } from "../../utils/questionLabels";
+import { useQuestionAuthors } from "../../hooks/useQuestionAuthors";
 import Card from "../../components/ui/Card";
 import Button from "../../components/ui/Button";
 import Alert from "../../components/ui/Alert";
 import styles from "./SoloQuizStartPage.module.css";
 
 const TECH_TREE_THEME = "TECH_TREE";
+const ANY_CIVILISATION = [{ value: "", label: "Toutes les civilisations" }];
 const QUESTION_COUNTS = [10, 20, 40, 60];
 const MIN_QUESTIONS = 1;
 const MAX_QUESTIONS = 100;
@@ -40,6 +39,7 @@ interface SoloSettings {
   theme: string | null;
   civilisation: string | null;
   building: string | null;
+  authorUsername: string | null;
   excludeTechTree: boolean;
 }
 
@@ -49,6 +49,7 @@ const DEFAULT_SETTINGS: SoloSettings = {
   theme: null,
   civilisation: null,
   building: null,
+  authorUsername: null,
   excludeTechTree: false,
 };
 
@@ -98,6 +99,7 @@ const describe = (s: SoloSettings) => {
   ];
   if (s.civilisation) parts.push(getCivilisationLabel(s.civilisation));
   if (s.building) parts.push(BUILDING_LABELS[s.building] || s.building);
+  if (s.authorUsername) parts.push(`par ${s.authorUsername}`);
   if (s.excludeTechTree) parts.push("sans arbre des technologies");
   return parts.join(" · ");
 };
@@ -105,6 +107,7 @@ const describe = (s: SoloSettings) => {
 const SoloQuizStartPage: React.FC = () => {
   const navigate = useNavigate();
   const [settings, setSettings] = useState<SoloSettings>(loadSettings);
+  const authors = useQuestionAuthors();
   const [countDraft, setCountDraft] = useState(
     String(settings.numberOfQuestions),
   );
@@ -147,6 +150,7 @@ const SoloQuizStartPage: React.FC = () => {
         theme: chosen.theme ?? undefined,
         civilisation: chosen.civilisation ?? undefined,
         building: chosen.building ?? undefined,
+        authorUsername: chosen.authorUsername ?? undefined,
         excludedThemes: chosen.excludeTechTree ? [TECH_TREE_THEME] : undefined,
       });
       navigate("/quiz", {
@@ -168,10 +172,11 @@ const SoloQuizStartPage: React.FC = () => {
     settings.theme !== null ||
     settings.civilisation !== null ||
     settings.building !== null ||
+    settings.authorUsername !== null ||
     settings.excludeTechTree;
 
   return (
-    <div className="container mt-4 mb-5">
+    <div className="container page-fit mt-4">
       <Card className={styles.page}>
         <h1 className={styles.title}>Quizz solo</h1>
         <p className={styles.subtitle}>
@@ -333,21 +338,12 @@ const SoloQuizStartPage: React.FC = () => {
                 <label htmlFor="solo-civilisation" className="form-label">
                   Civilisation
                 </label>
-                <select
+                <CivilisationSelect
                   id="solo-civilisation"
-                  className="form-select"
                   value={settings.civilisation ?? ""}
-                  onChange={(e) =>
-                    update({ civilisation: e.target.value || null })
-                  }
-                >
-                  <option value="">Toutes les civilisations</option>
-                  {CIVILIZATIONS.map((label) => (
-                    <option key={label} value={CIVILIZATIONS_MAP[label]}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(value) => update({ civilisation: value || null })}
+                  extraOptions={ANY_CIVILISATION}
+                />
               </div>
               <div>
                 <label htmlFor="solo-building" className="form-label">
@@ -367,6 +363,33 @@ const SoloQuizStartPage: React.FC = () => {
                       </option>
                     ),
                   )}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="solo-author" className="form-label">
+                  Auteur
+                </label>
+                <select
+                  id="solo-author"
+                  className="form-select"
+                  value={settings.authorUsername ?? ""}
+                  onChange={(e) =>
+                    update({ authorUsername: e.target.value || null })
+                  }
+                >
+                  <option value="">Tous les auteurs</option>
+                  {/* Auteur mémorisé qui n'a plus de question validée */}
+                  {settings.authorUsername &&
+                    !authors.includes(settings.authorUsername) && (
+                      <option value={settings.authorUsername}>
+                        {settings.authorUsername}
+                      </option>
+                    )}
+                  {authors.map((author) => (
+                    <option key={author} value={author}>
+                      {author}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -405,6 +428,7 @@ const SoloQuizStartPage: React.FC = () => {
                     theme: null,
                     civilisation: null,
                     building: null,
+                    authorUsername: null,
                     excludeTechTree: false,
                   })
                 }

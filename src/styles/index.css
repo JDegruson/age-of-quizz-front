@@ -208,3 +208,86 @@ textarea {
 .page-xxl {
   max-width: 1200px;
 }
+
+/* ---- Mise en page : la fenêtre ne défile pas ------------------------------
+ * La navbar est fixe en haut, la zone principale (.app-main) prend le reste
+ * de l'écran. Les pages "page-fit" (une carte centrale) font défiler leur
+ * carte ; les autres font défiler la zone principale.
+ */
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  overflow: hidden;
+}
+
+#root {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.page-fit {
+  /* rétrécit jusqu'à la hauteur disponible au lieu de déborder */
+  flex: 0 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  /* remplace la marge basse, qui ne compte pas dans un conteneur flex qui défile */
+  padding-bottom: 1.5rem;
+}
+
+.page-fit > .card {
+  /* width : une carte centrée par marges auto ne s'étire plus en flex */
+  width: 100%;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.app-main,
+.page-fit > .card {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(206, 124, 2, 0.5) transparent;
+}
+
+/* Mobile / tablette : défilement classique de la page entière (barre
+ * d'adresse qui se masque, tirer pour actualiser, clavier virtuel...). La
+ * navbar reste collée en haut grâce à son position: sticky. Même seuil que
+ * le menu mobile de la navbar. */
+@media (max-width: 991.98px) {
+  html,
+  body,
+  #root {
+    height: auto;
+  }
+
+  body {
+    overflow: visible;
+  }
+
+  #root,
+  .app-main,
+  .page-fit {
+    display: block;
+  }
+
+  .app-main,
+  .page-fit > .card {
+    overflow: visible;
+  }
+
+  .page-fit {
+    padding-bottom: 0;
+    margin-bottom: 3rem;
+  }
+}

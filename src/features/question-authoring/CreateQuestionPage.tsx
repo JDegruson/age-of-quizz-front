@@ -48,7 +48,7 @@ const CreateQuestionPage: React.FC<CreateQuestionPageProps> = ({ config }) => {
   return (
     <>
       <ToastContainer />
-      <div className="container page-lg mt-5">
+      <div className="container page-fit page-lg mt-5">
         <Card style={{ position: "relative" }}>
           <Button
             variant="outline-secondary"

@@ -77,7 +77,7 @@ const DailyRiddlePage: React.FC = () => {
   };
 
   return (
-    <div className="container page-md mt-5 mb-5">
+    <div className="container page-fit page-md mt-5">
       <Card padding="lg">
         <h2 className={styles.title}>Énigme du jour #{riddle.number}</h2>
         <p className={styles.subtitle}>

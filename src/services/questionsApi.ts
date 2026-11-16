@@ -57,3 +57,9 @@ export const updateQuestion = async (questionData: any, jwt?: string) => {
     throw error;
   }
 };
+
+/** Usernames of authors with at least one validated question (public). */
+export const fetchQuestionAuthors = async (): Promise<string[]> => {
+  const response = await axios.get<string[]>(`${API_URL}/questions/authors`);
+  return response.data;
+};

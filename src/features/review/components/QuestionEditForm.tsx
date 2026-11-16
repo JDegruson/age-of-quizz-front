@@ -1,6 +1,8 @@
 import React from "react";
 import { BUILDING_OPTIONS } from "../../../data/buildings";
-import { CIVILIZATIONS_MAP } from "../../../data/civilizations";
+import CivilisationSelect from "../../../components/CivilisationSelect";
+
+const NO_CIVILISATION = [{ value: "NONE", label: "Aucune civilisation" }];
 import {
   getThemeLabel,
   QUESTION_THEME_OPTIONS,
@@ -105,19 +107,15 @@ const QuestionEditForm: React.FC<QuestionEditFormProps> = ({
             </select>
           </div>
           <div>
-            <label className="form-label">Civilisation</label>
-            <select
+            <label htmlFor="edit-civilisation" className="form-label">
+              Civilisation
+            </label>
+            <CivilisationSelect
+              id="edit-civilisation"
               value={form.civilisation}
-              onChange={(event) => onCivilisationChange(event.target.value)}
-              className="form-select"
-            >
-              <option value="NONE">Aucune civilisation</option>
-              {Object.entries(CIVILIZATIONS_MAP).map(([label, value]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
+              onChange={onCivilisationChange}
+              extraOptions={NO_CIVILISATION}
+            />
           </div>
           <div>
             <label className="form-label">Batiment</label>

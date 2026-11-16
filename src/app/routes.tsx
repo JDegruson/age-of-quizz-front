@@ -74,9 +74,12 @@ const AppRoutes: React.FC = () => (
       <Route path="/daily-riddle-admin" element={<DailyRiddleAdminPage />} />
       <Route
         path="/create-room"
-        element={<MultiplayerRoomPage mode="create" />}
+        element={<MultiplayerRoomPage key="create" mode="create" />}
       />
-      <Route path="/join-room" element={<MultiplayerRoomPage mode="join" />} />
+      <Route
+        path="/join-room"
+        element={<MultiplayerRoomPage key="join" mode="join" />}
+      />
       <Route path="/quiz" element={<QuizPage />} />
     </Routes>
   </>

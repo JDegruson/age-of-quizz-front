@@ -4,7 +4,7 @@ import LinkButton from "../components/ui/LinkButton";
 
 const BecomeAuthorPage: React.FC = () => {
   return (
-    <div className="container page-md mt-5">
+    <div className="container page-fit page-md mt-5">
       <Card padding="lg">
         <h1 className="text-center mb-4">
           <i className="bi bi-pencil-square me-2"></i>

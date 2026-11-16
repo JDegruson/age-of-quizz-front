@@ -61,7 +61,7 @@ const QuestionView: React.FC<QuestionViewProps> = ({
   ) : null;
 
   return (
-    <div className="container page-md mt-5">
+    <div className="container page-fit page-md mt-5">
       <Card shadow={false}>
         <div className="mb-3 fw-bold fs-5 text-center">
           Question {index + 1} / {total}

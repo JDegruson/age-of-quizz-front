@@ -97,6 +97,8 @@ export interface RoomSettings {
   theme?: string | null;
   civilisation?: string | null;
   building?: string | null;
+  /** Username of the questions' author. */
+  authorUsername?: string | null;
   excludedThemes?: string[] | null;
 }
 

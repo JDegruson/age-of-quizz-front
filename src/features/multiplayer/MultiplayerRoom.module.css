@@ -1,0 +1,188 @@
+.title {
+  font-weight: 800;
+  text-align: center;
+  margin-bottom: 0.25rem;
+}
+
+.subtitle {
+  text-align: center;
+  color: #a3a3a3;
+  margin-bottom: 1.5rem;
+}
+
+.panel {
+  padding: 16px;
+  margin-bottom: 1rem;
+  border-radius: 12px;
+  background-color: #111827;
+}
+
+.panelTitle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.muted {
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+.loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 2rem 0;
+  color: #a3a3a3;
+}
+
+/* Code field */
+.codeInput {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1.4rem;
+  letter-spacing: 0.25em;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.codeInput::placeholder {
+  letter-spacing: 0.05em;
+  font-size: 1rem;
+}
+
+/* Room header (code + invite) */
+.roomHeader {
+  text-align: center;
+  padding: 18px 16px;
+  margin-bottom: 1rem;
+  border-radius: 12px;
+  border: 1px solid rgba(206, 124, 2, 0.5);
+  background: linear-gradient(
+    135deg,
+    rgba(255, 165, 0, 0.12) 0%,
+    rgba(30, 30, 30, 0.6) 100%
+  );
+}
+
+.roomCodeLabel {
+  color: #a3a3a3;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.roomCode {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 2.2rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  color: #ffd700;
+  line-height: 1.2;
+  margin: 4px 0 10px;
+  word-break: break-all;
+}
+
+.copyButtons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+/* Players */
+.players {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.player {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.playerMe {
+  outline: 1px solid rgba(255, 215, 0, 0.5);
+}
+
+.playerName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  vertical-align: middle;
+  background: rgba(255, 255, 255, 0.1);
+  color: #d1d5db;
+}
+
+.tagHost {
+  background: rgba(255, 215, 0, 0.18);
+  color: #ffd700;
+}
+
+.ready {
+  color: #22c55e;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.notReady {
+  color: #f59e0b;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+/* Countdown */
+.countdown {
+  text-align: center;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #ffd700;
+  margin-bottom: 1rem;
+}
+
+/* Actions */
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hint {
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+.footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 1.25rem;
+}

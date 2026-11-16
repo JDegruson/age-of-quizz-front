@@ -35,6 +35,7 @@ const ReviewQuestionsPage: React.FC = () => {
   const [filter, setFilter] = useState<string>("ALL");
   const [typeFilter, setTypeFilter] = useState<string>("ALL");
   const [civilFilter, setCivilFilter] = useState<string>("ALL");
+  const [authorFilter, setAuthorFilter] = useState<string>("ALL");
   const [dateSort, setDateSort] = useState<string>("DESC");
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [expandedQuestionId, setExpandedQuestionId] = useState<number | null>(
@@ -106,7 +107,20 @@ const ReviewQuestionsPage: React.FC = () => {
   // Nouveau filtre ou tri : on repart des premières cartes.
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
-  }, [filter, typeFilter, civilFilter, dateSort]);
+  }, [filter, typeFilter, civilFilter, authorFilter, dateSort]);
+
+  // Auteurs présents dans les questions chargées, triés alphabétiquement.
+  const authors = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          questions
+            .map((q) => q.authorUsername)
+            .filter((name): name is string => !!name),
+        ),
+      ).sort((a, b) => a.localeCompare(b, "fr", { sensitivity: "base" })),
+    [questions],
+  );
 
   const sortedQuestions = useMemo(() => {
     const filtered = questions.filter((q) => {
@@ -114,7 +128,10 @@ const ReviewQuestionsPage: React.FC = () => {
       const matchesType = typeFilter === "ALL" || q.type === typeFilter;
       const matchesCivil =
         civilFilter === "ALL" || (q.civilisation || "NONE") === civilFilter;
-      return matchesStatus && matchesType && matchesCivil;
+      const matchesAuthor =
+        authorFilter === "ALL" ||
+        (q.authorUsername || "NONE") === authorFilter;
+      return matchesStatus && matchesType && matchesCivil && matchesAuthor;
     });
     const timeOf = (q: Question) => {
       const date = q.modifiedAt || q.createdAt;
@@ -123,7 +140,7 @@ const ReviewQuestionsPage: React.FC = () => {
     return filtered.sort((a, b) =>
       dateSort === "DESC" ? timeOf(b) - timeOf(a) : timeOf(a) - timeOf(b),
     );
-  }, [questions, filter, typeFilter, civilFilter, dateSort]);
+  }, [questions, filter, typeFilter, civilFilter, authorFilter, dateSort]);
 
   if (isAuthLoading || loading) {
     return (
@@ -245,6 +262,9 @@ const ReviewQuestionsPage: React.FC = () => {
           onTypeFilterChange={setTypeFilter}
           civilFilter={civilFilter}
           onCivilFilterChange={setCivilFilter}
+          authorFilter={authorFilter}
+          onAuthorFilterChange={setAuthorFilter}
+          authors={authors}
           dateSort={dateSort}
           onDateSortChange={setDateSort}
           resultCount={sortedQuestions.length}

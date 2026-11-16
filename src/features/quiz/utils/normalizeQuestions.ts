@@ -11,6 +11,16 @@ export interface QuizQuestion {
   explication?: string;
 }
 
+/** Returns a shuffled copy of the array (Fisher-Yates). */
+function shuffle<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [copy[i], copy[j]] = [copy[j], copy[i]];
+  }
+  return copy;
+}
+
 /** Converts a raw backend question payload into the shape the quiz screen renders. */
 export function normalizeQuestions(rawQuestions: any[]): QuizQuestion[] {
   return (rawQuestions || []).map((q: any) => {
@@ -25,12 +35,16 @@ export function normalizeQuestions(rawQuestions: any[]): QuizQuestion[] {
     let correctAnswerIds: number[] = [];
 
     if (Array.isArray(q.answers)) {
-      options = q.answers.map((a: any) => a.value || "");
-      optionIds = q.answers.map((a: any) => a.id || 0);
-      correctAnswers = q.answers
+      // Randomize answer order so the correct one isn't always at the same spot.
+      // TRUE_FALSE keeps its natural order (Vrai / Faux).
+      const answers =
+        q.type === "TRUE_FALSE" ? q.answers : shuffle(q.answers);
+      options = answers.map((a: any) => a.value || "");
+      optionIds = answers.map((a: any) => a.id || 0);
+      correctAnswers = answers
         .filter((a: any) => a.correct === true)
         .map((a: any) => a.value || "");
-      correctAnswerIds = q.answers
+      correctAnswerIds = answers
         .filter((a: any) => a.correct === true)
         .map((a: any) => a.id || 0);
     }
