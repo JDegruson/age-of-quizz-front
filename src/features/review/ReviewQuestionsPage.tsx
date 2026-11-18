@@ -71,16 +71,16 @@ const ReviewQuestionsPage: React.FC = () => {
 
   const hasRole = (...names: string[]) =>
     !!user?.roles?.some((role) => names.includes(role.name));
-  const isAdmin = hasRole("ADMIN");
   const isAuthor = hasRole("AUTHOR");
-  // Un auteur ne modifie que ses propres questions, un admin toutes.
+  // Les auteurs consultent la liste, seuls les relecteurs changent le statut.
+  const canReview = hasRole("REVIEWER", "ADMIN");
+  // Un relecteur (ou admin) modifie toutes les questions, y compris les
+  // siennes ; un simple auteur uniquement les siennes.
   const canEditQuestion = (question: Question) =>
-    isAdmin ||
+    canReview ||
     (isAuthor &&
       !!user?.username &&
       question.authorUsername === user.username);
-  // Les auteurs consultent la liste, seuls les relecteurs changent le statut.
-  const canReview = hasRole("REVIEWER", "ADMIN");
 
   useEffect(() => {
     const loadQuestions = async () => {

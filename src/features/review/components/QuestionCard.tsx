@@ -17,7 +17,7 @@ interface QuestionCardProps {
   onReject: () => void;
   onStartEdit: () => void;
   onZoomImage: (imageUrl: string) => void;
-  /** PUT /questions : ADMIN, ou AUTHOR sur ses propres questions. */
+  /** PUT /questions : REVIEWER / ADMIN, ou AUTHOR sur ses propres questions. */
   canEdit: boolean;
   /** PUT /questions/{id}/{status} est réservé aux rôles REVIEWER / ADMIN. */
   canReview: boolean;
