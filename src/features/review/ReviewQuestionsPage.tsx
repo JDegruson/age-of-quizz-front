@@ -77,15 +77,18 @@ const ReviewQuestionsPage: React.FC = () => {
   const hasRole = (...names: string[]) =>
     !!user?.roles?.some((role) => names.includes(role.name));
   const isAuthor = hasRole("AUTHOR");
-  // Les auteurs consultent la liste, seuls les relecteurs changent le statut.
-  const canReview = hasRole("REVIEWER", "ADMIN");
+  const isAdmin = hasRole("ADMIN");
+  const isReviewer = hasRole("REVIEWER", "ADMIN");
+  const isOwnQuestion = (question: Question) =>
+    !!user?.username && question.authorUsername === user.username;
   // Un relecteur (ou admin) modifie toutes les questions, y compris les
   // siennes ; un simple auteur uniquement les siennes.
   const canEditQuestion = (question: Question) =>
-    canReview ||
-    (isAuthor &&
-      !!user?.username &&
-      question.authorUsername === user.username);
+    isReviewer || (isAuthor && isOwnQuestion(question));
+  // Seuls les relecteurs changent le statut, et jamais sur leurs propres
+  // questions (sauf admin).
+  const canReviewQuestion = (question: Question) =>
+    isAdmin || (isReviewer && !isOwnQuestion(question));
 
   useEffect(() => {
     const loadQuestions = async () => {
@@ -330,7 +333,7 @@ const ReviewQuestionsPage: React.FC = () => {
                 setZoomedImageUrl(imageUrl);
               }}
               canEdit={canEditQuestion(question)}
-              canReview={canReview}
+              canReview={canReviewQuestion(question)}
               isPending={pendingQuestionId === question.id}
               editForm={editForm}
               isSavingEdit={savingEdit}

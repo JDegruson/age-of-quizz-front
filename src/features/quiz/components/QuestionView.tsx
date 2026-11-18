@@ -5,6 +5,15 @@ import Card from "../../../components/ui/Card";
 import Button from "../../../components/ui/Button";
 import Alert from "../../../components/ui/Alert";
 import QuestionMedia from "../../../components/QuestionMedia";
+import { getTypeLabel } from "../../../utils/questionLabels";
+import styles from "./QuestionView.module.css";
+
+const TYPE_ICONS: Record<string, string> = {
+  MULTIPLE: "bi-list-check",
+  TRUE_FALSE: "bi-toggles",
+  IMAGE: "bi-image",
+  SOUND: "bi-volume-up",
+};
 
 interface QuestionViewProps {
   question: QuizQuestion;
@@ -78,6 +87,15 @@ const QuestionView: React.FC<QuestionViewProps> = ({
             ? `Temps écoulé : ${timer}s`
             : `Temps restant : ${timer}s`}
         </div>
+        <div className="text-center mb-2">
+          <span className={styles.typeBadge}>
+            <i
+              className={`bi ${TYPE_ICONS[q.type] ?? "bi-question-circle"}`}
+              aria-hidden="true"
+            ></i>
+            {getTypeLabel(q.type)}
+          </span>
+        </div>
         <div className="mb-4 fs-4 text-center">{q.intitule}</div>
         <div className="mb-3 text-center" style={{ color: "#9ca3af" }}>
           Auteur : {q.authorName || "Inconnu"}
@@ -129,19 +147,24 @@ const QuestionView: React.FC<QuestionViewProps> = ({
           )}
           {q.options.map((opt, idx) => {
             const optionId = q.optionIds[idx];
+            const isSelected = selected.includes(optionId);
             return (
-              <Button
+              <button
                 key={opt}
-                variant={
-                  selected.includes(optionId) ? "theme" : "outline-theme"
-                }
-                className="w-100 mb-2"
-                style={{ fontWeight: 600, fontSize: 18 }}
+                type="button"
+                aria-pressed={isSelected}
+                className={`${styles.answer} ${isSelected ? styles.selected : ""}`}
                 onClick={() => onSelect(opt)}
                 disabled={isWaitingNextQuestion || isSubmitting}
               >
+                {isSelected && (
+                  <i
+                    className={`bi bi-check-circle-fill ${styles.check}`}
+                    aria-hidden="true"
+                  ></i>
+                )}
                 {opt}
-              </Button>
+              </button>
             );
           })}
         </div>

@@ -17,8 +17,55 @@ export interface Badge {
  * unlocks as soon as the stat reaches its target.
  */
 export const computeBadges = (stats: UserStats): Badge[] => {
-  const { overview, multiplayer, dailyRiddle, author } = stats;
+  const { overview, multiplayer, dailyRiddle, author, reviewer } = stats;
   const answeredThemes = stats.byTheme.filter((t) => t.answered > 0).length;
+
+  // Only relevant to reviewers: hidden for everyone else (players can't
+  // unlock them on their own).
+  const reviewerBadges: Badge[] = reviewer
+    ? [
+        {
+          id: "sentinel",
+          name: "Sentinelle",
+          description: "Valider ou rejeter une première question",
+          icon: "bi-check2-circle",
+          current: reviewer.decisions,
+          target: 1,
+        },
+        {
+          id: "guardian",
+          name: "Gardien du savoir",
+          description: "Valider ou rejeter 50 questions",
+          icon: "bi-shield-check",
+          current: reviewer.decisions,
+          target: 50,
+        },
+        {
+          id: "high-reviewer",
+          name: "Grand relecteur",
+          description: "Valider ou rejeter 250 questions",
+          icon: "bi-patch-check-fill",
+          current: reviewer.decisions,
+          target: 250,
+        },
+        {
+          id: "proofreader",
+          name: "Correcteur",
+          description: "Corriger 10 questions d'autres auteurs",
+          icon: "bi-pen-fill",
+          current: reviewer.modified,
+          target: 10,
+        },
+        {
+          id: "mentor",
+          name: "Mentor",
+          description: "Relire les questions de 10 auteurs différents",
+          icon: "bi-mortarboard-fill",
+          current: reviewer.authorsHelped,
+          target: 10,
+        },
+      ]
+    : [];
 
   return [
     {
@@ -173,6 +220,7 @@ export const computeBadges = (stats: UserStats): Badge[] => {
       current: author?.timesAnswered ?? 0,
       target: 1000,
     },
+    ...reviewerBadges,
   ];
 };
 

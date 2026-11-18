@@ -15,50 +15,83 @@
   margin-bottom: 1.5rem;
 }
 
-/* Quick start */
-.quick {
+/* Mode choice */
+.modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.modeCard {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 16px 18px;
+  text-align: center;
+  gap: 8px;
+  padding: 24px 20px 20px;
   border-radius: 12px;
-  border: 1px solid rgba(206, 124, 2, 0.5);
+  border: 1px solid #333;
+  background: rgba(30, 30, 30, 0.6);
+}
+
+.modeQuick {
+  border-color: rgba(206, 124, 2, 0.5);
   background: linear-gradient(
     135deg,
     rgba(255, 165, 0, 0.12) 0%,
     rgba(30, 30, 30, 0.6) 100%
   );
-  margin-bottom: 1.5rem;
 }
 
-.quickTitle {
+.modeIcon {
+  font-size: 2rem;
+  color: #ffa500;
+  line-height: 1;
+}
+
+.modeTitle {
+  font-size: 1.2rem;
   font-weight: 700;
   color: #f0f0f0;
+  margin: 0;
 }
 
-.quickText {
+.modeText {
+  color: #a3a3a3;
+  font-size: 0.9rem;
+  margin: 0;
+  /* les boutons restent alignés en bas des deux cartes */
+  flex: 1;
+}
+
+.modeLast {
+  color: #d4d4d4;
+  font-size: 0.8rem;
+  margin: 0;
+}
+
+@media (max-width: 575.98px) {
+  .modes {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Custom screen */
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: 0.5rem;
   color: #a3a3a3;
   font-size: 0.9rem;
 }
 
-.divider {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: #a3a3a3;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  margin-bottom: 1rem;
-}
-
-.divider::before,
-.divider::after {
-  content: "";
-  flex: 1;
-  border-top: 1px solid #333;
+.back:hover,
+.back:focus-visible {
+  color: #ffa500;
 }
 
 /* Option groups */

@@ -19,7 +19,10 @@ interface QuestionCardProps {
   onZoomImage: (imageUrl: string) => void;
   /** PUT /questions : REVIEWER / ADMIN, ou AUTHOR sur ses propres questions. */
   canEdit: boolean;
-  /** PUT /questions/{id}/{status} est réservé aux rôles REVIEWER / ADMIN. */
+  /**
+   * PUT /questions/{id}/{status} : REVIEWER sur les questions des autres,
+   * ADMIN sur toutes.
+   */
   canReview: boolean;
   /** Changement de statut en cours pour cette question. */
   isPending: boolean;

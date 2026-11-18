@@ -223,7 +223,7 @@ const ProfileStats: React.FC<ProfileStatsProps> = ({ userProfileId, jwt }) => {
     );
   }
 
-  const { overview, multiplayer, dailyRiddle, author } = stats;
+  const { overview, multiplayer, dailyRiddle, author, reviewer } = stats;
   const accuracy = percent(overview.correctAnswers, overview.questionsAnswered);
 
   return (
@@ -370,6 +370,20 @@ const ProfileStats: React.FC<ProfileStatsProps> = ({ userProfileId, jwt }) => {
             <Tile label="Validées" value={author.validated} />
             <Tile label="En relecture" value={author.inReview} />
             <Tile label="Refusées" value={author.rejected} />
+          </div>
+        </Section>
+      )}
+
+      {reviewer && (
+        <Section title="Relecteur">
+          <div className={styles.tiles}>
+            <Tile
+              label="Questions relues"
+              value={reviewer.decisions}
+              hint={`${reviewer.validated} validées · ${reviewer.rejected} rejetées`}
+            />
+            <Tile label="Questions corrigées" value={reviewer.modified} />
+            <Tile label="Auteurs relus" value={reviewer.authorsHelped} />
           </div>
         </Section>
       )}

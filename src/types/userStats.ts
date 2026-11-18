@@ -39,6 +39,17 @@ export interface UserStats {
     /** Answers given by other players to this author's questions. */
     timesAnswered: number;
   } | null;
+  /** Null when the player never reviewed a question. */
+  reviewer: {
+    /** Validations + rejections. */
+    decisions: number;
+    validated: number;
+    rejected: number;
+    /** Questions of other authors corrected. */
+    modified: number;
+    /** Distinct other authors whose questions were reviewed. */
+    authorsHelped: number;
+  } | null;
 }
 
 export interface CategoryStat {

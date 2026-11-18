@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import BACKEND_URL from "../../config";
 
 import { BUILDING_LABELS, BUILDING_OPTIONS } from "../../data/buildings";
@@ -57,6 +57,14 @@ const DEFAULT_SETTINGS: SoloSettings = {
 const clampCount = (value: number) =>
   Math.max(MIN_QUESTIONS, Math.min(MAX_QUESTIONS, Math.round(value)));
 
+const hasSavedSettings = () => {
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) !== null;
+  } catch {
+    return false;
+  }
+};
+
 /** Last settings used, so a player doesn't redo their choices every time. */
 const loadSettings = (): SoloSettings => {
   try {
@@ -107,7 +115,12 @@ const describe = (s: SoloSettings) => {
 
 const SoloQuizStartPage: React.FC = () => {
   const navigate = useNavigate();
+  // Deux écrans : le choix du mode, puis la personnalisation (?mode=custom,
+  // pour que le retour du navigateur ramène au choix).
+  const [searchParams, setSearchParams] = useSearchParams();
+  const isCustom = searchParams.get("mode") === "custom";
   const [settings, setSettings] = useState<SoloSettings>(loadSettings);
+  const [hasSaved] = useState(hasSavedSettings);
   const authors = useQuestionAuthors();
   const [countDraft, setCountDraft] = useState(
     String(settings.numberOfQuestions),
@@ -179,266 +192,317 @@ const SoloQuizStartPage: React.FC = () => {
   return (
     <div className="container page-fit mt-4">
       <Card className={styles.page}>
-        <h1 className={styles.title}>Quizz solo</h1>
-        <p className={styles.subtitle}>
-          Lance une partie rapide ou compose ton quizz sur mesure.
-        </p>
+        {!isCustom ? (
+          <>
+            <h1 className={styles.title}>Quizz solo</h1>
+            <p className={styles.subtitle}>Comment veux-tu jouer ?</p>
 
-        <div className={styles.quick}>
-          <div>
-            <div className={styles.quickTitle}>
-              <i className="bi bi-lightning-charge-fill me-2" aria-hidden="true"></i>
-              Partie rapide
-            </div>
-            <div className={styles.quickText}>
-              {QUICK_GAME_QUESTIONS} questions au hasard, 15 secondes chacune
-            </div>
-          </div>
-          <Button
-            type="button"
-            disabled={loading}
-            className="rounded-pill px-4"
-            onClick={() => start(DEFAULT_SETTINGS)}
-          >
-            <i className="bi bi-play-fill me-1" aria-hidden="true"></i>
-            Jouer
-          </Button>
-        </div>
-
-        <div className={styles.divider}>ou personnalise ta partie</div>
-
-        <form onSubmit={handleSubmit}>
-          <fieldset className={styles.group}>
-            <legend className={styles.legend}>
-              <i className="bi bi-list-ol" aria-hidden="true"></i>
-              Nombre de questions
-            </legend>
-            <div className={styles.chips}>
-              {QUESTION_COUNTS.map((count) => (
-                <Chip
-                  key={count}
-                  selected={settings.numberOfQuestions === count}
-                  onClick={() => setCount(count)}
-                >
-                  {count}
-                </Chip>
-              ))}
-              <div className={styles.stepper}>
-                <button
+            <div className={styles.modes}>
+              <div className={`${styles.modeCard} ${styles.modeQuick}`}>
+                <i
+                  className={`bi bi-lightning-charge-fill ${styles.modeIcon}`}
+                  aria-hidden="true"
+                ></i>
+                <h2 className={styles.modeTitle}>Partie rapide</h2>
+                <p className={styles.modeText}>
+                  {QUICK_GAME_QUESTIONS} questions au hasard sur tous les
+                  thèmes, 15 secondes chacune.
+                </p>
+                <Button
                   type="button"
-                  aria-label="Une question de moins"
-                  disabled={settings.numberOfQuestions <= MIN_QUESTIONS}
-                  onClick={() => setCount(settings.numberOfQuestions - 1)}
+                  disabled={loading}
+                  className="w-100 rounded-pill"
+                  onClick={() => start(DEFAULT_SETTINGS)}
                 >
-                  −
-                </button>
-                <input
-                  type="number"
-                  inputMode="numeric"
-                  min={MIN_QUESTIONS}
-                  max={MAX_QUESTIONS}
-                  aria-label="Nombre de questions"
-                  value={countDraft}
-                  onChange={(e) => setCountDraft(e.target.value)}
-                  onBlur={commitCountDraft}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      commitCountDraft();
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  aria-label="Une question de plus"
-                  disabled={settings.numberOfQuestions >= MAX_QUESTIONS}
-                  onClick={() => setCount(settings.numberOfQuestions + 1)}
-                >
-                  +
-                </button>
-              </div>
-            </div>
-          </fieldset>
-
-          <fieldset className={styles.group}>
-            <legend className={styles.legend}>
-              <i className="bi bi-stopwatch" aria-hidden="true"></i>
-              Temps par question
-            </legend>
-            <div className={styles.chips}>
-              <Chip
-                selected={!settings.unlimitedTime}
-                onClick={() => update({ unlimitedTime: false })}
-                icon="bi-hourglass-split"
-              >
-                15 secondes
-              </Chip>
-              <Chip
-                selected={settings.unlimitedTime}
-                onClick={() => update({ unlimitedTime: true })}
-                icon="bi-infinity"
-              >
-                Illimité
-              </Chip>
-            </div>
-            {settings.unlimitedTime && (
-              <p className={styles.hint}>
-                Prends ton temps : plus tu réponds vite, plus tu marques de
-                points.
-              </p>
-            )}
-          </fieldset>
-
-          <fieldset className={styles.group}>
-            <legend className={styles.legend}>
-              <i className="bi bi-tags" aria-hidden="true"></i>
-              Thème
-            </legend>
-            <div className={styles.chips}>
-              <Chip
-                selected={settings.theme === null}
-                onClick={() => update({ theme: null })}
-                icon="bi-shuffle"
-              >
-                Tous
-              </Chip>
-              {QUESTION_THEME_OPTIONS.filter(
-                (value) =>
-                  !(settings.excludeTechTree && value === TECH_TREE_THEME),
-              ).map((value) => (
-                <Chip
-                  key={value}
-                  selected={settings.theme === value}
-                  onClick={() => update({ theme: value })}
-                  icon={THEME_ICONS[value]}
-                >
-                  {getThemeLabel(value)}
-                </Chip>
-              ))}
-            </div>
-            <label className={styles.switch}>
-              <input
-                type="checkbox"
-                role="switch"
-                className="form-check-input m-0"
-                checked={settings.excludeTechTree}
-                onChange={(e) => toggleExcludeTechTree(e.target.checked)}
-              />
-              Exclure les questions sur l'arbre des technologies
-            </label>
-          </fieldset>
-
-          <fieldset className={styles.group}>
-            <legend className={styles.legend}>
-              <i className="bi bi-funnel" aria-hidden="true"></i>
-              Filtres
-              <span className={styles.chipSmall}>(facultatifs)</span>
-            </legend>
-            <div className={styles.filters}>
-              <div>
-                <label htmlFor="solo-civilisation" className="form-label">
-                  Civilisation
-                </label>
-                <CivilisationSelect
-                  id="solo-civilisation"
-                  value={settings.civilisation ?? ""}
-                  onChange={(value) => update({ civilisation: value || null })}
-                  extraOptions={ANY_CIVILISATION}
-                />
-              </div>
-              <div>
-                <label htmlFor="solo-building" className="form-label">
-                  Bâtiment
-                </label>
-                <select
-                  id="solo-building"
-                  className="form-select"
-                  value={settings.building ?? ""}
-                  onChange={(e) => update({ building: e.target.value || null })}
-                >
-                  <option value="">Tous les bâtiments</option>
-                  {BUILDING_OPTIONS.filter((o) => o.value !== "NONE").map(
-                    (option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ),
+                  {loading ? (
+                    "Chargement..."
+                  ) : (
+                    <>
+                      <i className="bi bi-play-fill me-1" aria-hidden="true"></i>
+                      Jouer
+                    </>
                   )}
-                </select>
+                </Button>
               </div>
-              <div>
-                <label htmlFor="solo-author" className="form-label">
-                  Auteur
-                </label>
-                <select
-                  id="solo-author"
-                  className="form-select"
-                  value={settings.authorUsername ?? ""}
-                  onChange={(e) =>
-                    update({ authorUsername: e.target.value || null })
-                  }
+
+              <div className={styles.modeCard}>
+                <i
+                  className={`bi bi-sliders ${styles.modeIcon}`}
+                  aria-hidden="true"
+                ></i>
+                <h2 className={styles.modeTitle}>Quizz personnalisé</h2>
+                <p className={styles.modeText}>
+                  Choisis le nombre de questions, le temps, le thème, la
+                  civilisation, le bâtiment ou l'auteur.
+                </p>
+                {hasSaved && (
+                  <p className={styles.modeLast}>
+                    Derniers réglages : {describe(settings)}
+                  </p>
+                )}
+                <Button
+                  type="button"
+                  variant="outline-theme"
+                  disabled={loading}
+                  className="w-100 rounded-pill"
+                  onClick={() => setSearchParams({ mode: "custom" })}
                 >
-                  <option value="">Tous les auteurs</option>
-                  {/* Auteur mémorisé qui n'a plus de question validée */}
-                  {settings.authorUsername &&
-                    !authors.includes(settings.authorUsername) && (
-                      <option value={settings.authorUsername}>
-                        {settings.authorUsername}
-                      </option>
-                    )}
-                  {authors.map((author) => (
-                    <option key={author} value={author}>
-                      {author}
-                    </option>
-                  ))}
-                </select>
+                  <i className="bi bi-gear me-1" aria-hidden="true"></i>
+                  Personnaliser
+                </Button>
               </div>
             </div>
-            {hasFilters && (
-              <p className={styles.hint}>
-                S'il n'y a pas assez de questions correspondantes, la partie est
-                complétée avec des questions au hasard.
-              </p>
-            )}
-          </fieldset>
-
-          <div className={styles.summary}>
-            <p className={styles.summaryText} aria-live="polite">
-              {describe(settings)}
-            </p>
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-100 btn-lg rounded-pill"
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={styles.back}
+              onClick={() => setSearchParams({})}
             >
-              {loading ? (
-                "Chargement..."
-              ) : (
-                <>
-                  <i className="bi bi-play-fill me-1" aria-hidden="true"></i>
-                  Lancer le quizz
-                </>
-              )}
-            </Button>
-            {hasFilters && (
-              <button
-                type="button"
-                className={styles.reset}
-                onClick={() =>
-                  update({
-                    theme: null,
-                    civilisation: null,
-                    building: null,
-                    authorUsername: null,
-                    excludeTechTree: false,
-                  })
-                }
-              >
-                Réinitialiser les filtres
-              </button>
-            )}
-          </div>
-        </form>
+              <i className="bi bi-arrow-left" aria-hidden="true"></i>
+              Retour
+            </button>
+            <h1 className={styles.title}>Quizz personnalisé</h1>
+            <p className={styles.subtitle}>
+              Compose ta partie, tes réglages sont mémorisés pour la prochaine
+              fois.
+            </p>
+
+            <form onSubmit={handleSubmit}>
+              <fieldset className={styles.group}>
+                <legend className={styles.legend}>
+                  <i className="bi bi-list-ol" aria-hidden="true"></i>
+                  Nombre de questions
+                </legend>
+                <div className={styles.chips}>
+                  {QUESTION_COUNTS.map((count) => (
+                    <Chip
+                      key={count}
+                      selected={settings.numberOfQuestions === count}
+                      onClick={() => setCount(count)}
+                    >
+                      {count}
+                    </Chip>
+                  ))}
+                  <div className={styles.stepper}>
+                    <button
+                      type="button"
+                      aria-label="Une question de moins"
+                      disabled={settings.numberOfQuestions <= MIN_QUESTIONS}
+                      onClick={() => setCount(settings.numberOfQuestions - 1)}
+                    >
+                      −
+                    </button>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      min={MIN_QUESTIONS}
+                      max={MAX_QUESTIONS}
+                      aria-label="Nombre de questions"
+                      value={countDraft}
+                      onChange={(e) => setCountDraft(e.target.value)}
+                      onBlur={commitCountDraft}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          commitCountDraft();
+                        }
+                      }}
+                    />
+                    <button
+                      type="button"
+                      aria-label="Une question de plus"
+                      disabled={settings.numberOfQuestions >= MAX_QUESTIONS}
+                      onClick={() => setCount(settings.numberOfQuestions + 1)}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </fieldset>
+
+              <fieldset className={styles.group}>
+                <legend className={styles.legend}>
+                  <i className="bi bi-stopwatch" aria-hidden="true"></i>
+                  Temps par question
+                </legend>
+                <div className={styles.chips}>
+                  <Chip
+                    selected={!settings.unlimitedTime}
+                    onClick={() => update({ unlimitedTime: false })}
+                    icon="bi-hourglass-split"
+                  >
+                    15 secondes
+                  </Chip>
+                  <Chip
+                    selected={settings.unlimitedTime}
+                    onClick={() => update({ unlimitedTime: true })}
+                    icon="bi-infinity"
+                  >
+                    Illimité
+                  </Chip>
+                </div>
+                {settings.unlimitedTime && (
+                  <p className={styles.hint}>
+                    Prends ton temps : plus tu réponds vite, plus tu marques de
+                    points.
+                  </p>
+                )}
+              </fieldset>
+
+              <fieldset className={styles.group}>
+                <legend className={styles.legend}>
+                  <i className="bi bi-tags" aria-hidden="true"></i>
+                  Thème
+                </legend>
+                <div className={styles.chips}>
+                  <Chip
+                    selected={settings.theme === null}
+                    onClick={() => update({ theme: null })}
+                    icon="bi-shuffle"
+                  >
+                    Tous
+                  </Chip>
+                  {QUESTION_THEME_OPTIONS.filter(
+                    (value) =>
+                      !(settings.excludeTechTree && value === TECH_TREE_THEME),
+                  ).map((value) => (
+                    <Chip
+                      key={value}
+                      selected={settings.theme === value}
+                      onClick={() => update({ theme: value })}
+                      icon={THEME_ICONS[value]}
+                    >
+                      {getThemeLabel(value)}
+                    </Chip>
+                  ))}
+                </div>
+                <label className={styles.switch}>
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    className="form-check-input m-0"
+                    checked={settings.excludeTechTree}
+                    onChange={(e) => toggleExcludeTechTree(e.target.checked)}
+                  />
+                  Exclure les questions sur l'arbre des technologies
+                </label>
+              </fieldset>
+
+              <fieldset className={styles.group}>
+                <legend className={styles.legend}>
+                  <i className="bi bi-funnel" aria-hidden="true"></i>
+                  Filtres
+                  <span className={styles.chipSmall}>(facultatifs)</span>
+                </legend>
+                <div className={styles.filters}>
+                  <div>
+                    <label htmlFor="solo-civilisation" className="form-label">
+                      Civilisation
+                    </label>
+                    <CivilisationSelect
+                      id="solo-civilisation"
+                      value={settings.civilisation ?? ""}
+                      onChange={(value) => update({ civilisation: value || null })}
+                      extraOptions={ANY_CIVILISATION}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="solo-building" className="form-label">
+                      Bâtiment
+                    </label>
+                    <select
+                      id="solo-building"
+                      className="form-select"
+                      value={settings.building ?? ""}
+                      onChange={(e) => update({ building: e.target.value || null })}
+                    >
+                      <option value="">Tous les bâtiments</option>
+                      {BUILDING_OPTIONS.filter((o) => o.value !== "NONE").map(
+                        (option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ),
+                      )}
+                    </select>
+                  </div>
+                  <div>
+                    <label htmlFor="solo-author" className="form-label">
+                      Auteur
+                    </label>
+                    <select
+                      id="solo-author"
+                      className="form-select"
+                      value={settings.authorUsername ?? ""}
+                      onChange={(e) =>
+                        update({ authorUsername: e.target.value || null })
+                      }
+                    >
+                      <option value="">Tous les auteurs</option>
+                      {/* Auteur mémorisé qui n'a plus de question validée */}
+                      {settings.authorUsername &&
+                        !authors.includes(settings.authorUsername) && (
+                          <option value={settings.authorUsername}>
+                            {settings.authorUsername}
+                          </option>
+                        )}
+                      {authors.map((author) => (
+                        <option key={author} value={author}>
+                          {author}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                {hasFilters && (
+                  <p className={styles.hint}>
+                    S'il n'y a pas assez de questions correspondantes, la partie est
+                    complétée avec des questions au hasard.
+                  </p>
+                )}
+              </fieldset>
+
+              <div className={styles.summary}>
+                <p className={styles.summaryText} aria-live="polite">
+                  {describe(settings)}
+                </p>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-100 btn-lg rounded-pill"
+                >
+                  {loading ? (
+                    "Chargement..."
+                  ) : (
+                    <>
+                      <i className="bi bi-play-fill me-1" aria-hidden="true"></i>
+                      Lancer le quizz
+                    </>
+                  )}
+                </Button>
+                {hasFilters && (
+                  <button
+                    type="button"
+                    className={styles.reset}
+                    onClick={() =>
+                      update({
+                        theme: null,
+                        civilisation: null,
+                        building: null,
+                        authorUsername: null,
+                        excludeTechTree: false,
+                      })
+                    }
+                  >
+                    Réinitialiser les filtres
+                  </button>
+                )}
+              </div>
+            </form>
+          </>
+        )}
 
         {error && <Alert className="mt-3 text-center">{error}</Alert>}
       </Card>

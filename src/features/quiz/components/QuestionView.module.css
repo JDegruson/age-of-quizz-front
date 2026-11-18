@@ -1,0 +1,72 @@
+/*
+ * Answer buttons. They don't reuse .btn-outline-theme: its hover is the same
+ * gold gradient as the selected state, so hovered and selected answers looked
+ * identical. Here hover is a light tint, selection is the full gradient + a
+ * check mark.
+ */
+.answer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-bottom: 0.5rem;
+  padding: 10px 16px;
+  border: 2px solid #ce7c02;
+  border-radius: 8px;
+  background: transparent;
+  color: #ffa500;
+  font-size: 18px;
+  font-weight: 600;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s,
+    color 0.15s,
+    box-shadow 0.15s;
+}
+
+.answer:hover:not(:disabled) {
+  background: rgba(255, 165, 0, 0.1);
+  border-color: #ffa500;
+  color: #fff;
+}
+
+.answer:focus-visible {
+  outline: 2px solid #ffd700;
+  outline-offset: 2px;
+}
+
+.selected,
+.selected:hover:not(:disabled) {
+  background: linear-gradient(135deg, #ffd700 0%, #ffa500 50%, #ce7c02 100%);
+  border-color: #ffd700;
+  color: #1a1a1a;
+  box-shadow: 0 4px 12px rgba(255, 165, 0, 0.45);
+}
+
+.selected:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+
+.answer:disabled {
+  cursor: default;
+  opacity: 0.65;
+}
+
+.check {
+  font-size: 1.1rem;
+}
+
+/* Reminder of the question type (QCM, Vrai/Faux, image, son) */
+.typeBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(96, 165, 250, 0.5);
+  background: rgba(96, 165, 250, 0.12);
+  color: #93c5fd;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
