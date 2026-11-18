@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useUser } from "../../context/UserContext";
+import { requestNotificationsRefresh } from "../../services/notificationsApi";
 import { useRequireRole } from "../../hooks/useRequireRole";
 import {
   fetchQuestions,
@@ -29,6 +31,9 @@ const PAGE_SIZE = 50;
  */
 const ReviewQuestionsPage: React.FC = () => {
   const { user } = useUser();
+  const [searchParams, setSearchParams] = useSearchParams();
+  // ?question=<id> (lien depuis une notification) : on n'affiche que cette question.
+  const focusedQuestionId = Number(searchParams.get("question")) || null;
   const [questions, setQuestions] = useState<Question[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +109,11 @@ const ReviewQuestionsPage: React.FC = () => {
     }
   }, [isAuthenticated, canViewQuestions, user?.jwt]);
 
+  // Arrivée depuis une notification : la question ciblée est dépliée.
+  useEffect(() => {
+    if (focusedQuestionId) setExpandedQuestionId(focusedQuestionId);
+  }, [focusedQuestionId]);
+
   // Nouveau filtre ou tri : on repart des premières cartes.
   useEffect(() => {
     setVisibleCount(PAGE_SIZE);
@@ -123,6 +133,9 @@ const ReviewQuestionsPage: React.FC = () => {
   );
 
   const sortedQuestions = useMemo(() => {
+    if (focusedQuestionId) {
+      return questions.filter((q) => q.id === focusedQuestionId);
+    }
     const filtered = questions.filter((q) => {
       const matchesStatus = filter === "ALL" || q.status === filter;
       const matchesType = typeFilter === "ALL" || q.type === typeFilter;
@@ -140,7 +153,15 @@ const ReviewQuestionsPage: React.FC = () => {
     return filtered.sort((a, b) =>
       dateSort === "DESC" ? timeOf(b) - timeOf(a) : timeOf(a) - timeOf(b),
     );
-  }, [questions, filter, typeFilter, civilFilter, authorFilter, dateSort]);
+  }, [
+    questions,
+    focusedQuestionId,
+    filter,
+    typeFilter,
+    civilFilter,
+    authorFilter,
+    dateSort,
+  ]);
 
   if (isAuthLoading || loading) {
     return (
@@ -172,6 +193,8 @@ const ReviewQuestionsPage: React.FC = () => {
       );
       replaceQuestion(updated);
       setError(null);
+      // La décision solde les notifications « à relire » de cette question.
+      requestNotificationsRefresh();
     } catch (err) {
       setError(`Erreur lors de la mise à jour du statut`);
       console.error(err);
@@ -255,6 +278,23 @@ const ReviewQuestionsPage: React.FC = () => {
 
         {error && <Alert className="mb-4">{error}</Alert>}
 
+        {focusedQuestionId ? (
+          <div
+            className="mb-4"
+            style={{ display: "flex", alignItems: "center", gap: "12px" }}
+          >
+            <span style={{ color: "#9ca3af" }}>
+              Question #{focusedQuestionId}
+            </span>
+            <Button
+              variant="outline-theme"
+              className="btn-sm"
+              onClick={() => setSearchParams({})}
+            >
+              Afficher toutes les questions
+            </Button>
+          </div>
+        ) : (
         <QuestionFilterBar
           statusFilter={filter}
           onStatusFilterChange={setFilter}
@@ -269,6 +309,7 @@ const ReviewQuestionsPage: React.FC = () => {
           onDateSortChange={setDateSort}
           resultCount={sortedQuestions.length}
         />
+        )}
 
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           {visibleQuestions.map((question) => (
@@ -328,7 +369,9 @@ const ReviewQuestionsPage: React.FC = () => {
                 fontSize: "16px",
               }}
             >
-              Aucune question trouvée pour ce filtre.
+              {focusedQuestionId
+                ? "Cette question n'existe plus."
+                : "Aucune question trouvée pour ce filtre."}
             </div>
           )}
         </div>

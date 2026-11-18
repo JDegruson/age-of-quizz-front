@@ -1,0 +1,204 @@
+.wrapper {
+  position: relative;
+}
+
+.bellButton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: none;
+  border: none;
+  color: #d4d4d4;
+  font: inherit;
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.bellButton:hover,
+.bellButton:focus-visible,
+.bellButton[aria-expanded="true"] {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.mobileLabel {
+  display: none;
+  font-size: 1rem;
+}
+
+.badge {
+  position: absolute;
+  top: 2px;
+  right: 0;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+}
+
+.panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  background: #1f1f1f;
+  border: 1px solid #333;
+  border-top: 3px solid #ffa500;
+  border-radius: 10px;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #333;
+  color: #f0f0f0;
+  font-weight: 600;
+}
+
+.markAll {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #ffa500;
+  font-size: 0.8rem;
+  font-weight: 400;
+}
+
+.markAll:hover,
+.markAll:focus-visible {
+  text-decoration: underline;
+}
+
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: #a3a3a3;
+  text-align: left;
+  font: inherit;
+}
+
+.item:hover,
+.item:focus-visible {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.unread {
+  color: #f0f0f0;
+  background: rgba(255, 165, 0, 0.06);
+}
+
+.itemIcon {
+  margin-top: 2px;
+  font-size: 1rem;
+}
+
+.itemBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.itemTitle {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.itemLibelle {
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.itemTime {
+  font-size: 0.75rem;
+  color: #8a8a8a;
+}
+
+.dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: #ffa500;
+}
+
+.empty {
+  margin: 0;
+  padding: 18px 14px;
+  color: #9ca3af;
+  text-align: center;
+}
+
+.toneSuccess {
+  color: #4ade80;
+}
+
+.toneDanger {
+  color: #f87171;
+}
+
+.toneInfo {
+  color: #60a5fa;
+}
+
+.toneWarning {
+  color: #fbbf24;
+}
+
+@media (max-width: 991.98px) {
+  .bellButton {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .mobileLabel {
+    display: inline;
+  }
+
+  .badge {
+    position: static;
+    margin-left: auto;
+  }
+
+  /* Inline in the collapsed menu, like the role dropdowns */
+  .panel {
+    position: static;
+    width: auto;
+    max-width: none;
+    margin-top: 6px;
+    box-shadow: none;
+  }
+}

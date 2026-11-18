@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useUser } from "../context/UserContext";
 import { useAuth } from "../context/AuthContext";
+import NotificationBell from "../features/notifications/NotificationBell";
 import Logo from "./Logo";
 import Button from "./ui/Button";
 import LinkButton from "./ui/LinkButton";
@@ -95,7 +96,9 @@ const Navbar: React.FC = () => {
   const location = useLocation();
   const navRef = useRef<HTMLElement>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [openMenu, setOpenMenu] = useState<RoleMenuDef["id"] | null>(null);
+  const [openMenu, setOpenMenu] = useState<
+    RoleMenuDef["id"] | "notifications" | null
+  >(null);
 
   const hasRole = (name: string) =>
     !!user?.roles?.some((role) => role.name === name);
@@ -209,6 +212,19 @@ const Navbar: React.FC = () => {
           <ul className={styles.account}>
             {user ? (
               <>
+                {/* Only authors and reviewers receive notifications for now */}
+                {user.jwt && (isAuthor || isReviewer) && (
+                  <NotificationBell
+                    jwt={user.jwt}
+                    isOpen={openMenu === "notifications"}
+                    onToggle={() =>
+                      setOpenMenu((current) =>
+                        current === "notifications" ? null : "notifications",
+                      )
+                    }
+                    onClose={() => setOpenMenu(null)}
+                  />
+                )}
                 <li>
                   <Link to="/profile" className={styles.profileLink}>
                     <i className="bi bi-person-circle" aria-hidden="true"></i>
