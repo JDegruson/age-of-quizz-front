@@ -228,8 +228,12 @@ const ReviewQuestionsPage: React.FC = () => {
         user.jwt,
       );
       replaceQuestion(updated);
+      // Approuver ou rejeter clôt aussi les signalements (fait côté back).
+      if (newStatus === "VALIDATED" || newStatus === "REJECTED") {
+        setReports((prev) => prev.filter((r) => r.questionId !== questionId));
+      }
       setError(null);
-      // La décision solde les notifications « à relire » de cette question.
+      // La décision solde les notifications « à relire » et « signalée » de cette question.
       requestNotificationsRefresh();
     } catch (err) {
       setError(`Erreur lors de la mise à jour du statut`);
@@ -305,6 +309,11 @@ const ReviewQuestionsPage: React.FC = () => {
         user.jwt,
       );
       replaceQuestion(updated);
+      // Le back clôt les signalements quand c'est un relecteur qui modifie.
+      if (isReviewer && reportsByQuestion.has(updated.id)) {
+        setReports((prev) => prev.filter((r) => r.questionId !== updated.id));
+        requestNotificationsRefresh();
+      }
       cancelEditing();
     } catch (err) {
       setError("Erreur lors de la modification de la question");
