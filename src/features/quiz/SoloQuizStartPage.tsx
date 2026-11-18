@@ -30,6 +30,7 @@ const THEME_ICONS: Record<string, string> = {
   UNIT_STATS: "bi-bar-chart",
   SOUND: "bi-volume-up",
   CULTURE: "bi-book",
+  SHORTCUTS: "bi-keyboard",
 };
 
 interface SoloSettings {
