@@ -3,7 +3,8 @@ export type NotificationType =
   | "QUESTION_REJECTED"
   | "QUESTION_MODIFIED"
   | "QUESTION_TO_REVIEW"
-  | "QUESTION_RESUBMITTED";
+  | "QUESTION_RESUBMITTED"
+  | "QUESTION_REPORTED";
 
 /** Mirrors NotificationDTO on the back. */
 export interface AppNotification {

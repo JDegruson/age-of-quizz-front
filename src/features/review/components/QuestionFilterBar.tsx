@@ -63,6 +63,7 @@ const QuestionFilterBar: React.FC<QuestionFilterBarProps> = ({
             <option value="CLAIMED_REVIEW">Prise en charge</option>
             <option value="VALIDATED">Validées</option>
             <option value="REJECTED">Rejetées</option>
+            <option value="REPORTED">Signalées</option>
           </select>
         </div>
 

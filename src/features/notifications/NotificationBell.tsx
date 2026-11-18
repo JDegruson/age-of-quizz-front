@@ -36,6 +36,11 @@ const TYPE_DISPLAY: Record<
     tone: styles.toneWarning,
     text: (actor) => `Question corrigée par ${actor}, à relire`,
   },
+  QUESTION_REPORTED: {
+    icon: "bi-flag-fill",
+    tone: styles.toneDanger,
+    text: (actor) => `Question signalée par ${actor}`,
+  },
 };
 
 const relativeTime = (iso: string) => {

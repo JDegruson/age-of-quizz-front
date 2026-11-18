@@ -4,11 +4,14 @@ import { useUser } from "../../context/UserContext";
 import { requestNotificationsRefresh } from "../../services/notificationsApi";
 import { useRequireRole } from "../../hooks/useRequireRole";
 import {
+  fetchOpenReports,
   fetchQuestions,
+  resolveQuestionReports,
   updateQuestion,
   updateQuestionStatus,
 } from "../../services/questionsApi";
 import { Question } from "../../types/question";
+import type { QuestionReport } from "../../types/questionReport";
 import { useQuestionEditForm } from "./hooks/useQuestionEditForm";
 import QuestionFilterBar from "./components/QuestionFilterBar";
 import QuestionCard from "./components/QuestionCard";
@@ -19,6 +22,8 @@ import Spinner from "../../components/ui/Spinner";
 
 /** Nombre de cartes affichées d'un coup : la liste complète dépasse 1500 questions. */
 const PAGE_SIZE = 50;
+
+const NO_REPORTS: QuestionReport[] = [];
 
 /**
  * Orchestrates the review screen: auth guard, data fetching, filters/sort,
@@ -35,6 +40,10 @@ const ReviewQuestionsPage: React.FC = () => {
   // ?question=<id> (lien depuis une notification) : on n'affiche que cette question.
   const focusedQuestionId = Number(searchParams.get("question")) || null;
   const [questions, setQuestions] = useState<Question[]>([]);
+  const [reports, setReports] = useState<QuestionReport[]>([]);
+  const [resolvingQuestionId, setResolvingQuestionId] = useState<
+    number | null
+  >(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<string>("ALL");
@@ -96,8 +105,16 @@ const ReviewQuestionsPage: React.FC = () => {
 
       try {
         setLoading(true);
-        const data = await fetchQuestions(user.jwt);
+        // Les signalements sont un plus : leur échec ne bloque pas la liste.
+        const [data, openReports] = await Promise.all([
+          fetchQuestions(user.jwt),
+          fetchOpenReports(user.jwt).catch((err) => {
+            console.error(err);
+            return [] as QuestionReport[];
+          }),
+        ]);
         setQuestions(data);
+        setReports(openReports);
         setError(null);
       } catch (err) {
         setError("Erreur lors du chargement des questions");
@@ -135,12 +152,27 @@ const ReviewQuestionsPage: React.FC = () => {
     [questions],
   );
 
+  const reportsByQuestion = useMemo(() => {
+    const map = new Map<number, QuestionReport[]>();
+    reports.forEach((report) => {
+      map.set(report.questionId, [
+        ...(map.get(report.questionId) ?? []),
+        report,
+      ]);
+    });
+    return map;
+  }, [reports]);
+
   const sortedQuestions = useMemo(() => {
     if (focusedQuestionId) {
       return questions.filter((q) => q.id === focusedQuestionId);
     }
     const filtered = questions.filter((q) => {
-      const matchesStatus = filter === "ALL" || q.status === filter;
+      const matchesStatus =
+        filter === "ALL" ||
+        (filter === "REPORTED"
+          ? reportsByQuestion.has(q.id)
+          : q.status === filter);
       const matchesType = typeFilter === "ALL" || q.type === typeFilter;
       const matchesCivil =
         civilFilter === "ALL" || (q.civilisation || "NONE") === civilFilter;
@@ -158,6 +190,7 @@ const ReviewQuestionsPage: React.FC = () => {
     );
   }, [
     questions,
+    reportsByQuestion,
     focusedQuestionId,
     filter,
     typeFilter,
@@ -203,6 +236,24 @@ const ReviewQuestionsPage: React.FC = () => {
       console.error(err);
     } finally {
       setPendingQuestionId(null);
+    }
+  };
+
+  const handleResolveReports = async (questionId: number) => {
+    if (!user?.jwt) return;
+
+    try {
+      setResolvingQuestionId(questionId);
+      await resolveQuestionReports(questionId, user.jwt);
+      setReports((prev) => prev.filter((r) => r.questionId !== questionId));
+      setError(null);
+      // Les notifications « question signalée » sont soldées côté back.
+      requestNotificationsRefresh();
+    } catch (err) {
+      setError("Erreur lors de la clôture des signalements");
+      console.error(err);
+    } finally {
+      setResolvingQuestionId(null);
     }
   };
 
@@ -319,6 +370,10 @@ const ReviewQuestionsPage: React.FC = () => {
             <QuestionCard
               key={question.id}
               question={question}
+              reports={reportsByQuestion.get(question.id) ?? NO_REPORTS}
+              canResolveReports={isReviewer}
+              isResolvingReports={resolvingQuestionId === question.id}
+              onResolveReports={() => handleResolveReports(question.id)}
               isExpanded={expandedQuestionId === question.id}
               onToggleExpand={() =>
                 setExpandedQuestionId(

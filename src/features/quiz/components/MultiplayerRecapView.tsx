@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import type {
   GameRecapPayload,
   QuestionResponse,
@@ -8,11 +8,16 @@ import Button from "../../../components/ui/Button";
 import { formatPlayerName } from "../../../utils/playerLabel";
 import PlayerNameLink from "../../../components/PlayerNameLink";
 import QuestionMedia from "../../../components/QuestionMedia";
+import ReportQuestionModal from "../../../components/ReportQuestionModal";
 import styles from "./RecapView.module.css";
 
 interface MultiplayerRecapViewProps {
   recap: GameRecapPayload;
-  currentUser: { id?: number; username?: string } | null | undefined;
+  /** jwt présent = joueur connecté, qui peut signaler une question. */
+  currentUser:
+    | { id?: number; username?: string; jwt?: string }
+    | null
+    | undefined;
   openQuestionIndex: number | null;
   onToggleQuestion: (index: number) => void;
   onRequestRematch?: () => void;
@@ -71,6 +76,13 @@ const MultiplayerRecapView: React.FC<MultiplayerRecapViewProps> = ({
   rematchFeedback,
   onBackHome,
 }) => {
+  const [reportingQuestion, setReportingQuestion] = useState<{
+    id: number;
+    text: string;
+  } | null>(null);
+  const [reportedIds, setReportedIds] = useState<Set<number>>(new Set());
+  const jwt = currentUser?.jwt;
+
   const sortedPlayers = [...(recap.results?.playerResults || [])]
     .sort((a, b) => a.rank - b.rank)
     .map((player) => ({
@@ -295,6 +307,30 @@ const MultiplayerRecapView: React.FC<MultiplayerRecapViewProps> = ({
                         <p className="mb-0">{question.explanation}</p>
                       </div>
                     )}
+                    {jwt && (
+                      <div className={styles.reportLine}>
+                        {reportedIds.has(question.questionId) ? (
+                          <span className={styles.reported}>
+                            <i className="bi bi-check2 me-1" aria-hidden="true"></i>
+                            Signalement envoyé, merci !
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            className={styles.reportButton}
+                            onClick={() =>
+                              setReportingQuestion({
+                                id: question.questionId,
+                                text: question.questionText,
+                              })
+                            }
+                          >
+                            <i className="bi bi-flag me-1" aria-hidden="true"></i>
+                            Signaler un problème
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -324,6 +360,18 @@ const MultiplayerRecapView: React.FC<MultiplayerRecapViewProps> = ({
           Retour accueil
         </Button>
       </Card>
+      {reportingQuestion && jwt && (
+        <ReportQuestionModal
+          questionId={reportingQuestion.id}
+          questionText={reportingQuestion.text}
+          jwt={jwt}
+          onClose={() => setReportingQuestion(null)}
+          onReported={() => {
+            setReportedIds((prev) => new Set(prev).add(reportingQuestion.id));
+            setReportingQuestion(null);
+          }}
+        />
+      )}
     </div>
   );
 };

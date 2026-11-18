@@ -7,10 +7,18 @@ import type { EditQuestionForm } from "../utils/editForm";
 import StatusBadge from "./StatusBadge";
 import QuestionEditForm from "./QuestionEditForm";
 import QuestionDetails from "./QuestionDetails";
+import QuestionReports from "./QuestionReports";
 import Button from "../../../components/ui/Button";
+import type { QuestionReport } from "../../../types/questionReport";
 
 interface QuestionCardProps {
   question: Question;
+  /** Open player reports for this question (empty if none). */
+  reports: QuestionReport[];
+  /** REVIEWER / ADMIN: can close the reports. */
+  canResolveReports: boolean;
+  isResolvingReports: boolean;
+  onResolveReports: () => void;
   isExpanded: boolean;
   onToggleExpand: () => void;
   onApprove: () => void;
@@ -43,6 +51,10 @@ interface QuestionCardProps {
 
 const QuestionCard: React.FC<QuestionCardProps> = ({
   question,
+  reports,
+  canResolveReports,
+  isResolvingReports,
+  onResolveReports,
   isExpanded,
   onToggleExpand,
   onApprove,
@@ -119,7 +131,33 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
             Bâtiment: {getBuildingLabel(question.building)}
           </p>
         </div>
-        <StatusBadge status={question.status} />
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: "6px",
+          }}
+        >
+          <StatusBadge status={question.status} />
+          {reports.length > 0 && (
+            <span
+              style={{
+                padding: "2px 10px",
+                borderRadius: "999px",
+                fontSize: "13px",
+                fontWeight: 600,
+                color: "#fca5a5",
+                border: "1px solid #f87171",
+                backgroundColor: "rgba(248, 113, 113, 0.12)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              <i className="bi bi-flag-fill me-1" aria-hidden="true"></i>
+              {reports.length} signalement{reports.length > 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
       </div>
 
       <div style={{ marginTop: "16px", display: "flex", gap: "8px" }}>
@@ -181,6 +219,14 @@ const QuestionCard: React.FC<QuestionCardProps> = ({
             border: "1px solid #374151",
           }}
         >
+          {reports.length > 0 && (
+            <QuestionReports
+              reports={reports}
+              canResolve={canResolveReports}
+              isResolving={isResolvingReports}
+              onResolve={onResolveReports}
+            />
+          )}
           {isEditingThisQuestion && editForm && (
             <QuestionEditForm
               form={editForm}
