@@ -36,6 +36,7 @@ export const QUESTION_THEME_LABELS: { [key: string]: string } = {
   SOUND: "Son",
   CULTURE: "Culture et histoire",
   SHORTCUTS: "Raccourcis",
+  CAMPAIGN: "Campagne",
 };
 
 export const getThemeLabel = (theme?: string): string =>

@@ -58,7 +58,7 @@ export interface QuestionTypeConfig {
   resetTheme: boolean;
 }
 
-const THEME_OPTIONS = ["TECH_TREE", "UNIT_STATS", "CULTURE", "SHORTCUTS"];
+const THEME_OPTIONS = ["TECH_TREE", "UNIT_STATS", "CULTURE", "SHORTCUTS", "CAMPAIGN"];
 
 const NO_CORRECT_ANSWER_MESSAGE =
   "Au moins une bonne réponse doit être sélectionnée";
