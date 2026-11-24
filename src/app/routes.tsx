@@ -25,6 +25,7 @@ import BecomeAuthorPage from "../pages/BecomeAuthorPage";
 import SoloQuizStartPage from "../features/quiz/SoloQuizStartPage";
 import DailyRiddlePage from "../features/daily-riddle/DailyRiddlePage";
 import DailyRiddleAdminPage from "../features/daily-riddle/DailyRiddleAdminPage";
+import AdventCalendarPage from "../features/advent/AdventCalendarPage";
 import PageMeta from "./PageMeta";
 
 const AppRoutes: React.FC = () => (
@@ -72,6 +73,7 @@ const AppRoutes: React.FC = () => (
       <Route path="/quizz/multiplayer" element={<Navigate to="/" replace />} />
       <Route path="/daily-riddle" element={<DailyRiddlePage />} />
       <Route path="/daily-riddle-admin" element={<DailyRiddleAdminPage />} />
+      <Route path="/advent" element={<AdventCalendarPage />} />
       <Route
         path="/create-room"
         element={<MultiplayerRoomPage key="create" mode="create" />}

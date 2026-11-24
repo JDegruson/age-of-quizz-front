@@ -40,6 +40,13 @@ const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const redirectMessage = location.state?.message || null;
+  // Page d'origine (chemin interne uniquement), pour y revenir une fois connecté.
+  const redirectTo: string =
+    typeof location.state?.from === "string" &&
+    location.state.from.startsWith("/") &&
+    !location.state.from.startsWith("//")
+      ? location.state.from
+      : "/";
   const [error, setError] = useState<React.ReactNode>(null);
   const { login } = useAuth(); // ✅ Utilisation du contexte
   const { user, setUser } = useUser();
@@ -76,7 +83,7 @@ const LoginPage: React.FC = () => {
   };
   useEffect(() => {
     if (user) {
-      navigate("/");
+      navigate(redirectTo);
     }
   }, [user]);
   return (

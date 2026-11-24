@@ -1,7 +1,41 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Logo from "../components/Logo";
 import LinkButton from "../components/ui/LinkButton";
+import { fetchAdventCalendar } from "../services/adventApi";
 import styles from "./Home.module.css";
+
+/** Bannière du calendrier de l'avent, seulement pendant l'event. */
+const AdventBanner: React.FC = () => {
+  const [active, setActive] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchAdventCalendar()
+      .then((calendar) => !cancelled && setActive(calendar.active))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!active) return null;
+
+  return (
+    <section className={styles.advent}>
+      <i className={`bi bi-gift-fill ${styles.adventIcon}`} aria-hidden="true"></i>
+      <div className={styles.adventText}>
+        <h2 className={styles.adventTitle}>Calendrier de l'avent</h2>
+        <p className="mb-0">
+          Une question spéciale de Noël à débloquer chaque jour !
+        </p>
+      </div>
+      <LinkButton to="/advent" className="rounded-pill">
+        <i className="bi bi-stars me-2" aria-hidden="true"></i>
+        Ouvrir une case
+      </LinkButton>
+    </section>
+  );
+};
 
 const Home: React.FC = () => {
   return (
@@ -12,6 +46,8 @@ const Home: React.FC = () => {
           Testez vos connaissances sur Age of Empires 2
         </p>
       </div>
+
+      <AdventBanner />
 
       <div className={styles.modes}>
         <section className={styles.mode}>

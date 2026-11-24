@@ -67,3 +67,43 @@
   gap: 12px;
   margin-top: 1.5rem;
 }
+
+/* Calendrier de l'avent (visible seulement pendant l'event) */
+.advent {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding: 18px 20px;
+  border-radius: 14px;
+  border: 1px solid rgba(224, 180, 76, 0.55);
+  background:
+    radial-gradient(ellipse at 0% 50%, rgba(192, 57, 43, 0.45), transparent 60%),
+    radial-gradient(ellipse at 100% 50%, rgba(31, 122, 70, 0.45), transparent 60%),
+    #10203a;
+  color: #f4f8ff;
+}
+
+.adventIcon {
+  font-size: 2.4rem;
+  color: #e0b44c;
+  filter: drop-shadow(0 0 8px rgba(224, 180, 76, 0.6));
+}
+
+.adventText {
+  flex: 1;
+  min-width: 0;
+}
+
+.adventTitle {
+  font-size: 1.3rem;
+  font-weight: 800;
+  margin: 0 0 2px;
+}
+
+@media (max-width: 576px) {
+  .advent {
+    flex-direction: column;
+    text-align: center;
+  }
+}

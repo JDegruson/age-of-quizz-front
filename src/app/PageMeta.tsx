@@ -13,6 +13,7 @@ const TITLES: [RegExp, string][] = [
   [/^\/(create|join)-room$/, "Quiz multijoueur entre amis"],
   [/^\/daily-riddle$/, "Énigme du jour Age of Empires 2"],
   [/^\/daily-riddle-admin$/, "Admin des énigmes"],
+  [/^\/advent$/, "Calendrier de l'avent"],
   [/^\/leaderboard$/, "Classement des joueurs"],
   [/^\/profile(\/\d+)?$/, "Profil joueur"],
   [/^\/become-author$/, "Devenir auteur"],
